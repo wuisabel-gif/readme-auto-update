@@ -1,0 +1,4 @@
+interface:
+  display_name: "README Auto Update"
+  short_description: "Generate evidence-based GitHub profile READMEs"
+  default_prompt: "Use $readme-auto-update to analyze my GitHub work and update my profile README."

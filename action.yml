@@ -1,0 +1,104 @@
+name: README Auto Update
+description: Summarize GitHub work across repositories and keep a profile README current.
+author: README Auto Update contributors
+
+branding:
+  icon: edit-3
+  color: purple
+
+inputs:
+  github_token:
+    description: User-authorized GitHub token used to discover account-wide contributions.
+    required: true
+  openai_api_key:
+    description: Optional OpenAI API key. Required when mode is ai.
+    required: false
+  mode:
+    description: "README writer: auto, ai, or rules. Auto uses AI when a key is present."
+    required: false
+    default: auto
+  output_file:
+    description: Markdown file to create or update.
+    required: false
+    default: README.md
+  section_name:
+    description: Name used in the managed-section HTML comments.
+    required: false
+    default: readme-auto-update
+  model:
+    description: OpenAI model used in AI mode.
+    required: false
+    default: gpt-5.6-luna
+  days:
+    description: Contribution-history window, from 1 to 365 days.
+    required: false
+    default: "365"
+  max_repositories:
+    description: Maximum number of named repositories included in the README evidence.
+    required: false
+    default: "30"
+  include_owned:
+    description: Include repositories owned by the authenticated user.
+    required: false
+    default: "true"
+  include_organizations:
+    description: Include contributions to repositories owned by the user's organizations.
+    required: false
+    default: "true"
+  include_open_source:
+    description: Include public contributions outside the user's organizations.
+    required: false
+    default: "true"
+  include_private:
+    description: Include private activity when the token permits it.
+    required: false
+    default: "true"
+  show_private_names:
+    description: Allow private repository names and descriptions in generated evidence and output.
+    required: false
+    default: "false"
+  include_archived:
+    description: Include archived repositories.
+    required: false
+    default: "false"
+  prompt:
+    description: Additional style or content instructions for AI mode.
+    required: false
+  commit:
+    description: Commit and push README.md when it changes.
+    required: false
+    default: "true"
+  commit_message:
+    description: Commit message for automatic updates.
+    required: false
+    default: "docs: update README with README Auto Update"
+  commit_username:
+    description: Git author name for automatic updates.
+    required: false
+    default: readme-auto-update[bot]
+  commit_email:
+    description: Git author email for automatic updates.
+    required: false
+    default: readme-auto-update-bot@example.invalid
+  dry_run:
+    description: Generate and print a diff without writing or pushing.
+    required: false
+    default: "false"
+
+outputs:
+  changed:
+    description: Whether the README content changed.
+  mode_used:
+    description: The effective README writer mode.
+  output_file:
+    description: The updated Markdown path.
+  username:
+    description: The GitHub user summarized by the action.
+  repositories_analyzed:
+    description: Number of named repository summaries supplied to the writer.
+  private_contributions:
+    description: Visible and restricted private contribution count represented in the summary.
+
+runs:
+  using: docker
+  image: Dockerfile
