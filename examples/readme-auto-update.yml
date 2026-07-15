@@ -1,0 +1,28 @@
+name: Update profile README
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: readme-auto-update-profile
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: YOUR_GITHUB_USERNAME/readme-auto-update@v1
+        with:
+          github_token: ${{ secrets.README_AUTO_UPDATE_GITHUB_TOKEN }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          include_private: "true"
+          show_private_names: "false"
