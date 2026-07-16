@@ -1,12 +1,13 @@
 # README Auto Update
 
-README Auto Update is a Codex skill that creates and refreshes project or GitHub profile READMEs
-from repository evidence. It can understand local code, owned repositories, organization work,
-open-source contributions, and privacy-safe private contribution totals.
+README Auto Update is an agent skill for Claude Code and Codex that creates and refreshes project
+or GitHub profile READMEs from repository evidence. It can understand local code, owned
+repositories, organization work, open-source contributions, and privacy-safe private contribution
+totals.
 
-The Codex skill is the primary product. It lets you review the evidence and proposed README in an
-interactive session and does not require an OpenAI API key. An optional GitHub Action is included
-for scheduled, unattended updates.
+The skill is the primary product. It lets you review the evidence and proposed README in an
+interactive session and does not require any model API key — the agent you are already running is
+the writer. An optional GitHub Action is included for scheduled, unattended updates.
 
 ## What it can update
 
@@ -14,32 +15,49 @@ for scheduled, unattended updates.
 - A GitHub profile README from owned, organization, and open-source work
 - Private contribution totals without revealing private repository names
 - One generated section while preserving every hand-written section around it
-- A README on demand with Codex, or automatically on a GitHub Actions schedule
+- A README on demand with Claude Code or Codex, or automatically on a GitHub Actions schedule
 
-## Install the Codex skill
+## Install the skill
 
-Clone this repository, then copy the packaged skill into your personal Codex skills directory:
+For Claude Code, install the plugin straight from GitHub:
+
+```text
+/plugin marketplace add wuisabel-gif/readme-auto-update
+/plugin install readme-auto-update@readme-auto-update
+```
+
+Alternatively, clone this repository and copy the packaged skill into your agent's skills
+directory. The distributable skill is contained entirely in
+[`skills/readme-auto-update`](skills/readme-auto-update).
+
+For Claude Code (manual install):
+
+```bash
+mkdir -p ~/.claude/skills
+cp -R skills/readme-auto-update ~/.claude/skills/readme-auto-update
+```
+
+For Codex:
 
 ```bash
 mkdir -p ~/.codex/skills
 cp -R skills/readme-auto-update ~/.codex/skills/readme-auto-update
 ```
 
-Restart Codex if the skill is not immediately listed. The distributable skill is contained entirely
-in [`skills/readme-auto-update`](skills/readme-auto-update).
+Restart the agent if the skill is not immediately listed.
 
-## Use it in Codex
+## Use it
 
-Open a repository in Codex and ask:
+Open a repository in Claude Code and ask:
 
 ```text
-Use $readme-auto-update to analyze this repository and improve its README.
+Use /readme-auto-update to analyze this repository and improve its README.
 ```
 
-For a GitHub profile README:
+In Codex, the same request uses `$readme-auto-update`. For a GitHub profile README:
 
 ```text
-Use $readme-auto-update to update my profile README from my owned projects,
+Use /readme-auto-update to update my profile README from my owned projects,
 organization work, open-source contributions, and anonymous private activity.
 ```
 
@@ -48,7 +66,7 @@ shows or inspects the resulting diff. It does not commit or push unless you requ
 
 ### Local repository mode
 
-Local mode uses the repository already open in Codex. It inspects useful files and Git history while
+Local mode uses the repository already open in the agent. It inspects useful files and Git history while
 avoiding credentials, dependency trees, build artifacts, and unrelated generated files. No GitHub
 token or OpenAI API key is required.
 
@@ -90,13 +108,80 @@ This footer is also maintained by hand.
 If the markers are absent, the skill appends a managed block. It rejects duplicate, unbalanced, or
 injected markers instead of risking unrelated README content.
 
+## Example generated profile README
+
+The best output should read like a person explaining what they care about—not a dashboard reciting
+commit counts. This fictional AI-written example uses repository and contribution evidence to tell
+a compact story. The introduction and footer remain hand-written; only the marked section is
+regenerated.
+
+```md
+# Hi, I'm Example User
+
+I like building small tools that remove the annoying part of a larger problem.
+
+<!-- README-AUTO-UPDATE:START:readme-auto-update -->
+Most of these projects started with something I wanted to stop doing by hand. One began because I
+kept forgetting the right release commands. Another came from trying to test hardware software
+before the hardware existed. The useful part is not how many commits they took; it is that the next
+person can start a little farther ahead.
+
+## ⭐ Highlights
+
+- 🧵 **[Threadline](https://github.com/example-user/threadline).** Remembers the release steps for a
+  project and turns them into one repeatable command, with a dry run before anything is published.
+- 🌊 **[Tidepool](https://github.com/example-user/tidepool).** A simulator for testing telemetry and
+  packet handling while the real device is still being assembled.
+- ✍️ **[Plainspoken](https://github.com/example-user/plainspoken).** Finds stiff, generic language in
+  technical documentation and helps rewrite it without flattening the author's voice.
+
+## 🤝 Collaborations and open source
+
+- **[Example Docs Platform](https://github.com/example-org/docs-platform).** Contributed publishing
+  checks and preview tooling so documentation changes can be reviewed before they reach the main
+  site. Three pull requests were merged during the selected period.
+- **[Community Toolkit](https://github.com/community-library/toolkit).** Improved error reporting and
+  reviewed changes to the command-line interface. The goal was simple: failures should tell people
+  what to do next.
+
+## The rest of the workshop
+
+### Developer tools
+
+- **[Patchwork](https://github.com/example-user/patchwork).** Keeps small repository maintenance jobs
+  in one place instead of scattering them across shell history.
+- **[Logbook](https://github.com/example-user/logbook).** Turns noisy local development logs into a
+  searchable timeline of what changed and why a run failed.
+
+### Hardware and simulation
+
+- **[Signal Bench](https://github.com/example-user/signal-bench).** Generates realistic sensor traffic
+  for exercising parsers, dashboards, and failure handling without a lab setup.
+
+## Private work
+
+Some recent work happened in private repositories. Their names, organizations, technologies, and
+descriptions stay hidden; only the existence of that activity is included here.
+
+<sub>Last updated by README Auto Update on YYYY-MM-DD UTC.</sub>
+<!-- README-AUTO-UPDATE:END:readme-auto-update -->
+
+You can also find my manually maintained contact links below.
+```
+
+The AI writer can produce this narrative form because it can connect verified descriptions,
+documentation, and contribution evidence. The deterministic `rules` writer uses a simpler factual
+layout. Neither writer should invent motivation or impact: when the repository does not explain
+why something exists, the output should say what it does and stop there. Private repository
+identity remains hidden unless `show_private_names` is explicitly enabled.
+
 ## Optional automatic updates
 
 After the interactive workflow is working, the included GitHub Action can update a profile README
 on a schedule. Add these repository secrets under **Settings → Secrets and variables → Actions**:
 
 - `README_AUTO_UPDATE_GITHUB_TOKEN` — user-authorized token for account discovery
-- `OPENAI_API_KEY` — optional; required only for the Action's AI writer
+- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` — optional; either one enables the Action's AI writer
 
 Then create `.github/workflows/readme-auto-update.yml`:
 
@@ -127,6 +212,8 @@ jobs:
         with:
           github_token: ${{ secrets.README_AUTO_UPDATE_GITHUB_TOKEN }}
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          # or, to write with Claude instead:
+          # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
 Replace `YOUR_GITHUB_USERNAME/readme-auto-update@v1` with the repository owner and published tag,
@@ -134,9 +221,10 @@ or use a local checkout for development.
 
 ### Action writer modes
 
-- `auto` (default) uses AI when `openai_api_key` is present and deterministic rules otherwise.
-- `ai` writes from privacy-filtered evidence through the OpenAI Responses API.
-- `rules` makes no OpenAI request and has no model cost.
+- `auto` (default) uses AI when an API key is present and deterministic rules otherwise.
+- `ai` writes from privacy-filtered evidence through the OpenAI Responses API or the Anthropic
+  Messages API. When both keys are set, OpenAI is used.
+- `rules` makes no model request and has no model cost.
 
 Example rules-only configuration:
 
@@ -152,11 +240,12 @@ Example rules-only configuration:
 | Input | Default | Description |
 | --- | --- | --- |
 | `github_token` | required | User-authorized token used for account discovery |
-| `openai_api_key` | — | Required only in `ai` mode |
+| `openai_api_key` | — | AI mode requires this or `anthropic_api_key` |
+| `anthropic_api_key` | — | Used in AI mode when no OpenAI key is set |
 | `mode` | `auto` | `auto`, `ai`, or `rules` |
 | `output_file` | `README.md` | Markdown file to update |
 | `section_name` | `readme-auto-update` | Name embedded in marker comments |
-| `model` | `gpt-5.6-luna` | OpenAI model used by the Action's AI writer |
+| `model` | per provider | AI writer model; defaults to `gpt-5.6-luna` (OpenAI) or `claude-opus-4-8` (Anthropic) |
 | `days` | `365` | Contribution window from 1 to 365 days |
 | `max_repositories` | `30` | Maximum repository evidence entries passed to the writer |
 | `include_owned` | `true` | Include user-owned repositories |
@@ -190,7 +279,8 @@ See [`SECURITY.md`](SECURITY.md) for the threat model and the skill's
 ## Project structure
 
 ```text
-skills/readme-auto-update/  Installable Codex skill
+.claude-plugin/             Claude Code plugin and marketplace manifests
+skills/readme-auto-update/  Installable agent skill (Claude Code and Codex)
 src/readme_auto_update/     GitHub Action implementation
 examples/                   Example scheduled workflow
 tests/                      Skill and Action tests
@@ -207,6 +297,13 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m compileall -q entrypoint.py src tests skills/readme-auto-update/scripts
 docker build -t readme-auto-update .
 ```
+
+## Related projects
+
+- **[Cadence](https://github.com/wuisabel-gif/Cadence)** — an AI-text humanizer that scores prose
+  for machine-generated patterns and rewrites it in a chosen voice. Pair it with README Auto
+  Update: after generating a README section, run Cadence over the prose to catch flat sentence
+  rhythm and AI-sounding phrasing before publishing.
 
 ## License
 
