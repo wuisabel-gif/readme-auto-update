@@ -115,6 +115,44 @@ class GeneratorTests(unittest.TestCase):
         self.assertIn("Private work", payload["input"])
         self.assertIn("intentionally anonymized", payload["instructions"])
 
+    @patch("readme_auto_update.generators.urllib.request.urlopen")
+    def test_anthropic_writer_receives_structured_evidence(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            {
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": "## Projects\nUseful."}],
+            }
+        )
+        output = ai_summary(
+            sample_snapshot(),
+            provider="anthropic",
+            api_key="not-a-real-key",
+            model="",
+            prior_content="",
+            extra_prompt="",
+        )
+        self.assertEqual(output, "## Projects\nUseful.")
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.full_url, "https://api.anthropic.com/v1/messages")
+        self.assertEqual(request.get_header("X-api-key"), "not-a-real-key")
+        payload = json.loads(request.data)
+        self.assertEqual(payload["model"], "claude-opus-4-8")
+        self.assertIn("intentionally anonymized", payload["system"])
+        self.assertIn("Private work", payload["messages"][0]["content"])
+
+    @patch("readme_auto_update.generators.urllib.request.urlopen")
+    def test_anthropic_writer_raises_on_refusal(self, urlopen):
+        urlopen.return_value = FakeResponse({"stop_reason": "refusal", "content": []})
+        with self.assertRaisesRegex(RuntimeError, "refusal"):
+            ai_summary(
+                sample_snapshot(),
+                provider="anthropic",
+                api_key="not-a-real-key",
+                model="",
+                prior_content="",
+                extra_prompt="",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -35,11 +35,13 @@ def run(config: Config, root: Path | None = None) -> bool:
     mode = config.effective_mode
 
     if mode == "ai":
-        if not config.openai_api_key:
-            raise ValueError("openai_api_key is required when mode is ai")
+        api_key = config.openai_api_key or config.anthropic_api_key
+        if not api_key:
+            raise ValueError("openai_api_key or anthropic_api_key is required when mode is ai")
         generated = ai_summary(
             snapshot,
-            api_key=config.openai_api_key,
+            provider=config.ai_provider,
+            api_key=api_key,
             model=config.model,
             prior_content=managed_content(old_document, config.section_name),
             extra_prompt=config.prompt,

@@ -11,7 +11,10 @@ inputs:
     description: User-authorized GitHub token used to discover account-wide contributions.
     required: true
   openai_api_key:
-    description: Optional OpenAI API key. Required when mode is ai.
+    description: Optional OpenAI API key. AI mode requires this or anthropic_api_key.
+    required: false
+  anthropic_api_key:
+    description: Optional Anthropic API key. Used in AI mode when no OpenAI key is set.
     required: false
   mode:
     description: "README writer: auto, ai, or rules. Auto uses AI when a key is present."
@@ -26,9 +29,10 @@ inputs:
     required: false
     default: readme-auto-update
   model:
-    description: OpenAI model used in AI mode.
+    description: >-
+      Model used in AI mode. Defaults to gpt-5.6-luna for OpenAI and
+      claude-opus-4-8 for Anthropic.
     required: false
-    default: gpt-5.6-luna
   days:
     description: Contribution-history window, from 1 to 365 days.
     required: false

@@ -49,6 +49,7 @@ class Config:
     commit_username: str
     commit_email: str
     dry_run: bool
+    anthropic_api_key: str = ""
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -73,10 +74,11 @@ class Config:
         return cls(
             github_token=github_token,
             openai_api_key=_input("openai_api_key") or os.getenv("OPENAI_API_KEY", ""),
+            anthropic_api_key=_input("anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY", ""),
             mode=mode,
             output_file=output_file,
             section_name=section_name,
-            model=_input("model", "gpt-5.6-luna"),
+            model=_input("model"),
             days=_integer(_input("days", "365"), name="days", minimum=1, maximum=365),
             max_repositories=_integer(
                 _input("max_repositories", "30"),
@@ -116,5 +118,10 @@ class Config:
     @property
     def effective_mode(self) -> str:
         if self.mode == "auto":
-            return "ai" if self.openai_api_key else "rules"
+            return "ai" if self.openai_api_key or self.anthropic_api_key else "rules"
         return self.mode
+
+    @property
+    def ai_provider(self) -> str:
+        # ponytail: openai wins when both keys are set, preserving pre-anthropic behavior
+        return "openai" if self.openai_api_key else "anthropic"
