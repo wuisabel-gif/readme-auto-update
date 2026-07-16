@@ -1,0 +1,10 @@
+{
+  "name": "readme-auto-update",
+  "version": "0.2.0",
+  "description": "Create and refresh evidence-based project or GitHub profile READMEs while preserving manual content.",
+  "author": {
+    "name": "wuisabel-gif"
+  },
+  "homepage": "https://github.com/wuisabel-gif/readme-auto-update",
+  "license": "MIT"
+}

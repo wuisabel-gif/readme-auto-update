@@ -1,12 +1,12 @@
 ---
 name: readme-auto-update
-description: Analyze a local repository or GitHub account and create, rewrite, or refresh an evidence-based README while preserving manual content. Use when Codex should summarize a repository, improve a project README, maintain a GitHub profile README, include owned projects, organization work, open-source contributions, or privacy-safe private contribution counts, or install optional README update automation.
+description: Analyze a local repository or GitHub account and create, rewrite, or refresh an evidence-based README while preserving manual content. Use when the user wants to summarize a repository, improve a project README, maintain a GitHub profile README, include owned projects, organization work, open-source contributions, or privacy-safe private contribution counts, or install optional README update automation.
 ---
 
 # README Auto Update
 
-Create accurate READMEs from repository evidence. Use Codex as the writer; do not require an
-OpenAI API key for interactive skill runs.
+Create accurate READMEs from repository evidence. The active agent (Claude Code or Codex) is the
+writer; do not require any model API key for interactive skill runs.
 
 ## Choose the scope
 

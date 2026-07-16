@@ -1,0 +1,13 @@
+{
+  "name": "readme-auto-update",
+  "owner": {
+    "name": "wuisabel-gif"
+  },
+  "plugins": [
+    {
+      "name": "readme-auto-update",
+      "source": "./",
+      "description": "Create and refresh evidence-based project or GitHub profile READMEs while preserving manual content."
+    }
+  ]
+}
