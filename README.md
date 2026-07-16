@@ -208,7 +208,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: YOUR_GITHUB_USERNAME/readme-auto-update@v1
+      - uses: wuisabel-gif/readme-auto-update@v1
         with:
           github_token: ${{ secrets.README_AUTO_UPDATE_GITHUB_TOKEN }}
           openai_api_key: ${{ secrets.OPENAI_API_KEY }}
@@ -216,8 +216,34 @@ jobs:
           # anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
 
-Replace `YOUR_GITHUB_USERNAME/readme-auto-update@v1` with the repository owner and published tag,
-or use a local checkout for development.
+The published action uses the `wuisabel-gif/readme-auto-update@v1` major tag. Use a local
+checkout for development.
+
+### Publishing a release (maintainers)
+
+Releases are published from semantic-version tags. After merging the changes to release, create
+and push a version tag (do not move `v1` manually):
+
+```bash
+git checkout main
+git pull --ff-only origin main
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The [`Release Docker action`](.github/workflows/release.yml) workflow validates the tag, builds the
+Docker Action image once, and publishes it to GHCR as both
+`ghcr.io/wuisabel-gif/readme-auto-update:v1.0.0` and
+`ghcr.io/wuisabel-gif/readme-auto-update:v1` (for a `v1.x.y` release). It then force-updates the
+Git `v1` tag to the released commit. The workflow uses the repository `GITHUB_TOKEN`; its
+permissions are limited to package publishing and the contents access needed for the tag update.
+The `v1` update is guarded and does not recursively run another release.
+
+To consume the action, use the public repository coordinate:
+
+```yaml
+- uses: wuisabel-gif/readme-auto-update@v1
+```
 
 ### Action writer modes
 
@@ -229,7 +255,7 @@ or use a local checkout for development.
 Example rules-only configuration:
 
 ```yaml
-      - uses: YOUR_GITHUB_USERNAME/readme-auto-update@v1
+      - uses: wuisabel-gif/readme-auto-update@v1
         with:
           github_token: ${{ secrets.README_AUTO_UPDATE_GITHUB_TOKEN }}
           mode: rules

@@ -1,0 +1,80 @@
+name: Release Docker action
+
+on:
+  push:
+    # The job-level SemVer check below is authoritative; this avoids starting
+    # runs for the floating v1 tag and for unrelated branch/tag names.
+    tags:
+      - "v*.*.*"
+
+# Jobs narrow this further to the permissions they need.
+permissions: {}
+
+concurrency:
+  # Serialize releases so two v1 releases cannot race while moving the major tag.
+  group: readme-auto-update-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    # The v1 tag update below also matches the tag pattern, but must not start another release.
+    if: github.ref_type == 'tag' && github.ref != 'refs/tags/v1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Validate semantic release tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Not a semantic version tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/wuisabel-gif/readme-auto-update
+          tags: |
+            type=raw,value=${{ github.ref_name }}
+            type=raw,value=v1,enable=${{ startsWith(github.ref_name, 'v1.') }}
+
+      - name: Build and push action image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  move-v1-tag:
+    # Only a v1.x.y release is allowed to move the floating Git major tag.
+    if: github.ref_type == 'tag' && github.ref != 'refs/tags/v1' && startsWith(github.ref_name, 'v1.')
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Move floating v1 tag
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          # Push the exact event commit, never the checkout's symbolic ref.
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          git push origin --force "$RELEASE_SHA:refs/tags/v1"
