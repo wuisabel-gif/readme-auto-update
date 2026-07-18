@@ -10,6 +10,7 @@ from .github import GitHubClient
 
 REPOSITORY_FRAGMENT = """
 fragment RepositoryEvidence on Repository {
+  id
   nameWithOwner
   description
   url
@@ -27,7 +28,7 @@ fragment RepositoryEvidence on Repository {
 
 
 ACCOUNT_QUERY = REPOSITORY_FRAGMENT + """
-query ReadmeAutoUpdateAccount($from: DateTime!, $to: DateTime!) {
+query ReadmeAutoUpdateAccount($from: DateTime!, $to: DateTime!, $organizationsCursor: String, $repositoriesCursor: String, $issuesCursor: String) {
   viewer {
     login
     name
@@ -36,12 +37,13 @@ query ReadmeAutoUpdateAccount($from: DateTime!, $to: DateTime!) {
     location
     websiteUrl
     avatarUrl(size: 160)
-    organizations(first: 100) { nodes { login name } }
+    organizations(first: 100, after: $organizationsCursor) { nodes { login name } pageInfo { hasNextPage endCursor } }
     repositories(
       first: 100
       ownerAffiliations: [OWNER]
       orderBy: { field: UPDATED_AT, direction: DESC }
-    ) { nodes { ...RepositoryEvidence } }
+      after: $repositoriesCursor
+    ) { nodes { ...RepositoryEvidence } pageInfo { hasNextPage endCursor } }
     contributionsCollection(from: $from, to: $to) {
       startedAt
       endedAt
@@ -56,8 +58,9 @@ query ReadmeAutoUpdateAccount($from: DateTime!, $to: DateTime!) {
         repository { ...RepositoryEvidence }
         contributions(first: 1) { totalCount }
       }
-      issueContributions(first: 100) {
-        nodes { issue { repository { ...RepositoryEvidence } } }
+      issueContributions(first: 100, after: $issuesCursor) {
+        nodes { issue { id repository { ...RepositoryEvidence } } }
+        pageInfo { hasNextPage endCursor }
       }
       pullRequestContributionsByRepository(maxRepositories: 100) {
         repository { ...RepositoryEvidence }
@@ -71,6 +74,50 @@ query ReadmeAutoUpdateAccount($from: DateTime!, $to: DateTime!) {
   }
 }
 """
+
+
+ORGANIZATIONS_PAGE_QUERY = """
+query ReadmeAutoUpdateOrganizations($organizationsCursor: String) {
+  viewer {
+    organizations(first: 100, after: $organizationsCursor) { nodes { login name } pageInfo { hasNextPage endCursor } }
+  }
+}
+"""
+
+
+REPOSITORIES_PAGE_QUERY = REPOSITORY_FRAGMENT + """
+query ReadmeAutoUpdateRepositories($repositoriesCursor: String) {
+  viewer {
+    repositories(
+      first: 100
+      ownerAffiliations: [OWNER]
+      orderBy: { field: UPDATED_AT, direction: DESC }
+      after: $repositoriesCursor
+    ) { nodes { ...RepositoryEvidence } pageInfo { hasNextPage endCursor } }
+  }
+}
+"""
+
+
+ISSUES_PAGE_QUERY = REPOSITORY_FRAGMENT + """
+query ReadmeAutoUpdateIssues($from: DateTime!, $to: DateTime!, $issuesCursor: String) {
+  viewer {
+    contributionsCollection(from: $from, to: $to) {
+      issueContributions(first: 100, after: $issuesCursor) {
+        nodes { issue { id repository { ...RepositoryEvidence } } }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+"""
+
+
+_MAX_PAGES = 100
+
+
+class PaginationError(RuntimeError, ValueError):
+    """Safe, transport-neutral error for malformed pagination metadata."""
 
 
 @dataclass(frozen=True)
@@ -99,6 +146,7 @@ class RepositorySummary:
     stars: int
     forks: int
     updated_at: str
+    id: str = ""
     commits: int = 0
     pull_requests: int = 0
     issues: int = 0
@@ -164,6 +212,7 @@ def _repository(node: dict, login: str, organizations: set[str]) -> RepositorySu
         for item in ((node.get("repositoryTopics") or {}).get("nodes") or [])
     )
     return RepositorySummary(
+        id=_text(node.get("id")),
         name_with_owner=_text(node.get("nameWithOwner")),
         description=_text(node.get("description")),
         url=_text(node.get("url")),
@@ -189,11 +238,17 @@ def _get_or_add(
     if not node:
         return None
     name = _text(node.get("nameWithOwner"))
-    if not name:
+    identity = _text(node.get("id"))
+    if not name and not identity:
         return None
-    if name not in repositories:
-        repositories[name] = _repository(node, login, organizations)
-    return repositories[name]
+    # IDs survive renames and casing changes. Name fallback keeps old parser fixtures usable.
+    key = f"id:{identity.casefold()}" if identity else f"name:{name.casefold()}"
+    fallback_key = f"name:{name.casefold()}"
+    if identity and key not in repositories and fallback_key in repositories:
+        repositories[key] = repositories.pop(fallback_key)
+    if key not in repositories:
+        repositories[key] = _repository(node, login, organizations)
+    return repositories[key]
 
 
 def _private_aggregate(repositories: list[RepositorySummary], restricted: int) -> RepositorySummary | None:
@@ -202,6 +257,7 @@ def _private_aggregate(repositories: list[RepositorySummary], restricted: int) -
     if contribution_count == 0:
         return None
     return RepositorySummary(
+        id="",
         name_with_owner="Private work",
         description="Private repository activity; names and repository content are hidden.",
         url="",
@@ -231,6 +287,8 @@ def parse_account(data: dict, config: Config) -> AccountSnapshot:
             "The GitHub token did not resolve to a user account; use a user-authorized token"
         )
 
+    if data.get("__organizations_complete") is False:
+        raise ValueError("GitHub organization collection is incomplete; refusing classification")
     organization_nodes = (viewer.get("organizations") or {}).get("nodes") or []
     organizations = {
         _text(node.get("login")) for node in organization_nodes if _text(node.get("login"))
@@ -248,13 +306,15 @@ def parse_account(data: dict, config: Config) -> AccountSnapshot:
         if repository:
             repository.commits += int((group.get("contributions") or {}).get("totalCount") or 0)
 
+    issue_seen: set[str] = set()
     for node in (contributions.get("issueContributions") or {}).get("nodes") or []:
-        repository = _get_or_add(
-            repositories,
-            ((node or {}).get("issue") or {}).get("repository") or {},
-            login,
-            organizations,
-        )
+        issue = (node or {}).get("issue") or {}
+        identity = _text(issue.get("id"))
+        if identity:
+            if identity in issue_seen:
+                continue
+            issue_seen.add(identity)
+        repository = _get_or_add(repositories, issue.get("repository") or {}, login, organizations)
         if repository:
             repository.issues += 1
 
@@ -372,6 +432,73 @@ def parse_account(data: dict, config: Config) -> AccountSnapshot:
     )
 
 
+def _next_page(connection: dict, label: str, seen: set[str], *, required: bool = False) -> str | None:
+    """Return the next cursor; live collection always requires valid pageInfo."""
+    if not isinstance(connection, dict):
+        raise PaginationError(f"GitHub pagination for {label} returned a missing connection")
+    page_info = connection.get("pageInfo")
+    if page_info is None:
+        if required:
+            raise PaginationError(f"GitHub pagination for {label} returned missing pageInfo")
+        return None  # Legacy parser-only fixtures may omit pagination metadata.
+    if (not isinstance(page_info, dict) or
+            not isinstance(page_info.get("hasNextPage"), bool) or
+            "endCursor" not in page_info or
+            (page_info.get("endCursor") is not None and not isinstance(page_info.get("endCursor"), str))):
+        raise PaginationError(f"GitHub pagination for {label} returned invalid pageInfo")
+    if not page_info.get("hasNextPage"):
+        return None
+    cursor = page_info.get("endCursor")
+    if not isinstance(cursor, str) or not cursor:
+        raise PaginationError(f"GitHub pagination for {label} reported hasNextPage without a cursor")
+    if cursor in seen:
+        raise PaginationError(f"GitHub pagination for {label} repeated cursor")
+    seen.add(cursor)
+    return cursor
+
+
+def _paginate(client: GitHubClient, container: dict, field: str, query: str, page_variables) -> None:
+    """Fetch every remaining page of one connection with a minimal per-connection query."""
+    connection = container.get(field)
+    if not isinstance(connection, dict):
+        raise PaginationError(f"GitHub pagination for {field} returned a missing connection")
+    nodes = list(connection.get("nodes") or [])
+    seen: set[str] = set()
+    pages = 0
+    cursor = _next_page(connection, field, seen, required=True)
+    while cursor:
+        pages += 1
+        if pages > _MAX_PAGES:
+            raise PaginationError(f"GitHub pagination for {field} exceeded {_MAX_PAGES} pages")
+        page_viewer = client.graphql(query, page_variables(cursor)).get("viewer") or {}
+        page_container = page_viewer if field != "issueContributions" else (page_viewer.get("contributionsCollection") or {})
+        page_connection = page_container.get(field)
+        if not isinstance(page_connection, dict):
+            raise PaginationError(f"GitHub pagination for {field} returned a missing connection")
+        nodes.extend(page_connection.get("nodes") or [])
+        cursor = _next_page(page_connection, field, seen, required=True)
+    connection["nodes"] = nodes
+    container[field] = connection
+
+
+def _paged_account(config: Config, variables: dict) -> dict:
+    """Fetch all privacy-relevant connection pages with minimal per-connection queries."""
+    client = GitHubClient(config.github_token)
+    data = client.graphql(ACCOUNT_QUERY, variables)
+    viewer = data.get("viewer") or {}
+    _paginate(client, viewer, "organizations", ORGANIZATIONS_PAGE_QUERY,
+              lambda cursor: {"organizationsCursor": cursor})
+    if config.include_owned:
+        _paginate(client, viewer, "repositories", REPOSITORIES_PAGE_QUERY,
+                  lambda cursor: {"repositoriesCursor": cursor})
+    contributions = viewer.get("contributionsCollection")
+    if isinstance(contributions, dict):
+        _paginate(client, contributions, "issueContributions", ISSUES_PAGE_QUERY,
+                  lambda cursor: {"from": variables.get("from"), "to": variables.get("to"), "issuesCursor": cursor})
+    data["__organizations_complete"] = True
+    return data
+
+
 def build_account_snapshot(config: Config) -> AccountSnapshot:
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=config.days)
@@ -379,5 +506,5 @@ def build_account_snapshot(config: Config) -> AccountSnapshot:
         "from": start.isoformat().replace("+00:00", "Z"),
         "to": now.isoformat().replace("+00:00", "Z"),
     }
-    data = GitHubClient(config.github_token).graphql(ACCOUNT_QUERY, variables)
+    data = _paged_account(config, variables)
     return parse_account(data, config)
