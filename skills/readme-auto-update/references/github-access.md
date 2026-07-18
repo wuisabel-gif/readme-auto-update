@@ -36,6 +36,10 @@ can access private repositories.
 category is excluded, calculate displayed totals from the remaining repository evidence rather
 than showing account-wide totals that may contain the excluded work.
 
+## Pagination and API limits
+
+The collector requests organizations, owned repositories, and issue contributions in pages of 100, following `pageInfo.endCursor` until `hasNextPage` is false. Missing or repeated cursors are treated as an API error to prevent incomplete or unbounded collection. GitHub's contribution-by-repository connections remain capped at `maxRepositories: 100`, and `repositoryTopics(first: 10)` returns at most ten topics. Repositories beyond the contribution cap are not attributed individually; filtered/private per-repository totals can consequently be partial or undercounted beyond these caps. These capped connections are not claimed to be completely paginated. Private names remain redacted by default regardless of pagination.
+
 GitHub contribution-graph rules still apply. Commit attribution depends on linked commit email and
 eligible branches. Restricted contribution counts appear only when GitHub exposes them for the
 profile and credential.
