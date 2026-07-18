@@ -1,7 +1,10 @@
 import argparse
 import importlib.util
+import io
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+import urllib.error
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,6 +98,25 @@ def options(**overrides):
 
 
 class SkillSnapshotTests(unittest.TestCase):
+    def test_graphql_errors_redact_upstream_content(self):
+        http_error = urllib.error.HTTPError(
+            "https://api.github.com/graphql", 500, "error", {},
+            io.BytesIO(b"private-repository-sentinel"),
+        )
+        with patch.object(github_snapshot.urllib.request, "urlopen", side_effect=http_error):
+            with self.assertRaisesRegex(Exception, "HTTP 500") as raised:
+                github_snapshot.graphql("token", {})
+        self.assertNotIn("private-repository-sentinel", str(raised.exception))
+        response = type("Response", (), {
+            "__enter__": lambda self: self,
+            "__exit__": lambda self, *args: False,
+            "read": lambda self: b'{"errors":[{"message":"private-repository-sentinel"}]}',
+        })()
+        with patch.object(github_snapshot.urllib.request, "urlopen", return_value=response):
+            with self.assertRaises(Exception) as raised:
+                github_snapshot.graphql("token", {})
+        self.assertNotIn("private-repository-sentinel", str(raised.exception))
+
     def test_private_repository_identity_is_redacted_by_default(self):
         snapshot = github_snapshot.parse_account(account_data(), options())
         rendered = github_snapshot.json.dumps(snapshot)

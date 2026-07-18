@@ -1,11 +1,13 @@
 from dataclasses import replace
 import json
+import io
 import unittest
 from unittest.mock import patch
+import urllib.error
 
 from readme_auto_update.config import Config
 from readme_auto_update.github import GitHubClient
-from readme_auto_update.snapshot import parse_account
+from readme_auto_update.snapshot import _next_page, _paged_account, parse_account
 
 
 def config(**overrides) -> Config:
@@ -155,6 +157,124 @@ class SnapshotTests(unittest.TestCase):
         private = next(repository for repository in snapshot.repositories if repository.relationship == "private")
         self.assertEqual(private.contributions, 5)
         self.assertEqual(snapshot.private_contributions, 5)
+
+    def test_pagination_rejects_missing_and_repeated_cursors(self):
+        with self.assertRaisesRegex(ValueError, "without a cursor"):
+            _next_page({"pageInfo": {"hasNextPage": True, "endCursor": ""}}, "organizations", set())
+        with self.assertRaisesRegex(ValueError, "repeated cursor"):
+            _next_page({"pageInfo": {"hasNextPage": True, "endCursor": "cursor-1"}}, "issues", {"cursor-1"})
+
+    @patch("readme_auto_update.snapshot.GitHubClient.graphql")
+    def test_paged_account_merges_all_connections_without_leaking_private_names(self, graphql):
+        def repository(name, owner, private=False):
+            return {
+                "nameWithOwner": f"{owner}/{name}", "description": "", "url": "",
+                "isPrivate": private, "isArchived": False, "isFork": False,
+                "stargazerCount": 0, "forkCount": 0, "updatedAt": "",
+                "owner": {"login": owner}, "primaryLanguage": None,
+                "repositoryTopics": {"nodes": []},
+            }
+
+        def page(orgs, repos, issues, org_info, repo_info, issue_info):
+            return {"viewer": {
+                "login": "example-user", "organizations": {"nodes": orgs, "pageInfo": org_info},
+                "repositories": {"nodes": repos, "pageInfo": repo_info},
+                "contributionsCollection": {
+                    "startedAt": "", "endedAt": "", "issueContributions": {
+                        "nodes": issues, "pageInfo": issue_info,
+                    },
+                    "commitContributionsByRepository": [],
+                    "pullRequestContributionsByRepository": [],
+                    "pullRequestReviewContributionsByRepository": [],
+                },
+            }}
+
+        org_repo = repository("project", "later-org")
+        private_repo = repository("secret", "example-user", private=True)
+        responses = {
+            None: page([{"login": "first-org"}], [],
+                       [{"issue": {"id": "issue-1", "repository": org_repo}}],
+                       {"hasNextPage": True, "endCursor": "org-2"},
+                       {"hasNextPage": True, "endCursor": "repo-2"},
+                       {"hasNextPage": True, "endCursor": "issue-2"}),
+            "org-2": page([{"login": "later-org"}], [], [],
+                          {"hasNextPage": False, "endCursor": None},
+                          {"hasNextPage": False, "endCursor": None},
+                          {"hasNextPage": False, "endCursor": None}),
+            "repo-2": page([], [private_repo], [],
+                           {"hasNextPage": False, "endCursor": None},
+                           {"hasNextPage": False, "endCursor": None},
+                           {"hasNextPage": False, "endCursor": None}),
+            "issue-2": page([], [],
+                             [{"issue": {"id": "issue-1", "repository": org_repo}}],
+                             {"hasNextPage": False, "endCursor": None},
+                             {"hasNextPage": False, "endCursor": None},
+                             {"hasNextPage": False, "endCursor": None}),
+        }
+        graphql.side_effect = lambda query, variables: responses[variables.get("organizationsCursor") or variables.get("repositoriesCursor") or variables.get("issuesCursor")]
+        snapshot = parse_account(_paged_account(config(github_token="token"), {}), config(github_token="token"))
+        self.assertEqual([item.owner for item in snapshot.repositories if item.relationship == "organization"], ["later-org"])
+        self.assertEqual(sum(item.issues for item in snapshot.repositories), 1)
+        self.assertNotIn("example-user/secret", snapshot.as_prompt_text())
+        self.assertEqual(graphql.call_count, 4)
+
+    @patch("readme_auto_update.snapshot.GitHubClient.graphql")
+    def test_paged_account_skips_owned_repositories_when_disabled(self, graphql):
+        first_page = {"viewer": {
+            "login": "example-user",
+            "organizations": {"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}},
+            "repositories": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": "repo-2"}},
+            "contributionsCollection": {
+                "issueContributions": {"nodes": [], "pageInfo": {"hasNextPage": False, "endCursor": None}},
+            },
+        }}
+        graphql.return_value = first_page
+        _paged_account(config(github_token="token", include_owned=False), {})
+        self.assertEqual(graphql.call_count, 1)
+
+    def test_issue_contributions_without_ids_are_counted_individually(self):
+        def repo(name):
+            return {"nameWithOwner": name, "owner": {"login": name.split("/")[0]}}
+
+        data = {"viewer": {
+            "login": "example-user",
+            "organizations": {"nodes": []},
+            "repositories": {"nodes": []},
+            "contributionsCollection": {"issueContributions": {"nodes": [
+                {"issue": {"repository": repo("example-user/app")}},
+                {"issue": {"repository": repo("example-user/app")}},
+            ]}},
+        }}
+        snapshot = parse_account(data, config())
+        self.assertEqual(sum(item.issues for item in snapshot.repositories), 2)
+
+    @patch("readme_auto_update.snapshot.GitHubClient.graphql")
+    def test_pagination_fails_when_pages_never_terminate(self, graphql):
+        def endless(query, variables):
+            token = variables.get("organizationsCursor") or "seed"
+            return {"viewer": {
+                "login": "example-user",
+                "organizations": {"nodes": [], "pageInfo": {"hasNextPage": True, "endCursor": f"{token}-next"}},
+            }}
+
+        graphql.side_effect = endless
+        with self.assertRaises(ValueError):
+            _paged_account(config(github_token="token"), {})
+
+    def test_github_http_and_graphql_errors_redact_upstream_content(self):
+        http_error = urllib.error.HTTPError(
+            "https://api.github.com/graphql", 500, "error", {},
+            io.BytesIO(b"private-repository-sentinel"),
+        )
+        with patch("readme_auto_update.github.urllib.request.urlopen", side_effect=http_error):
+            with self.assertRaisesRegex(Exception, "HTTP 500") as raised:
+                GitHubClient("token").graphql("query", {})
+        self.assertNotIn("private-repository-sentinel", str(raised.exception))
+        with patch("readme_auto_update.github.urllib.request.urlopen",
+                   return_value=FakeResponse({"errors": [{"message": "private-repository-sentinel"}]})):
+            with self.assertRaises(Exception) as raised:
+                GitHubClient("token").graphql("query", {})
+        self.assertNotIn("private-repository-sentinel", str(raised.exception))
 
     @patch("readme_auto_update.github.urllib.request.urlopen")
     def test_github_client_posts_graphql_with_bearer_token(self, urlopen):
