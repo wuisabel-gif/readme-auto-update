@@ -158,6 +158,10 @@ person can start a little farther ahead.
 - **[Signal Bench](https://github.com/example-user/signal-bench).** Generates realistic sensor traffic
   for exercising parsers, dashboards, and failure handling without a lab setup.
 
+## Pagination and API limits
+
+The snapshot uses privacy-preserving GraphQL pagination for organizations, owned repositories, and issue contributions (100 items per request). It follows `pageInfo.endCursor` until exhaustion and rejects missing or repeated cursors rather than looping indefinitely. Contribution-by-repository connections are intentionally capped by GitHub's `maxRepositories: 100` API limit, and each repository's `repositoryTopics(first: 10)` is capped at ten topics. Activity beyond the contribution cap cannot be attributed to a repository; filtered or private per-repository totals can therefore be partial/undercounted beyond these caps, and are represented only by aggregate totals where available. The collector does not claim complete pagination for either capped connection.
+
 ## Private work
 
 Some recent work happened in private repositories. Their names, organizations, technologies, and

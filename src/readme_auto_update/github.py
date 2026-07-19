@@ -32,17 +32,17 @@ class GitHubClient:
             with urllib.request.urlopen(request, timeout=self._timeout) as response:
                 result = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")[:1000]
+            # Never include the upstream body: it can contain private repository names.
             raise GitHubAPIError(
-                f"GitHub API request failed with HTTP {exc.code}: {detail}"
+                f"GitHub API request failed with HTTP {exc.code}"
             ) from exc
         except urllib.error.URLError as exc:
-            raise GitHubAPIError(f"GitHub API request failed: {exc.reason}") from exc
+            raise GitHubAPIError("GitHub API request failed (network error)") from exc
 
         errors = result.get("errors") or []
         if errors:
-            messages = "; ".join(str(item.get("message", "Unknown GraphQL error")) for item in errors)
-            raise GitHubAPIError(f"GitHub GraphQL error: {messages[:1000]}")
+            # GraphQL messages can include private resource names or query details.
+            raise GitHubAPIError("GitHub GraphQL request failed (upstream error)")
         data = result.get("data")
         if not isinstance(data, dict):
             raise GitHubAPIError("GitHub GraphQL response did not contain data")

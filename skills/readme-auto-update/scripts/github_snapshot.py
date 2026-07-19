@@ -17,6 +17,7 @@ import urllib.request
 
 REPOSITORY_FIELDS = """
 fragment ReadmeRepository on Repository {
+  id
   nameWithOwner description url isPrivate isArchived isFork
   stargazerCount forkCount updatedAt
   owner { login }
@@ -26,15 +27,16 @@ fragment ReadmeRepository on Repository {
 """
 
 QUERY = REPOSITORY_FIELDS + """
-query ReadmeAutoUpdateSnapshot($from: DateTime!, $to: DateTime!) {
+query ReadmeAutoUpdateSnapshot($from: DateTime!, $to: DateTime!, $organizationsCursor: String, $repositoriesCursor: String, $issuesCursor: String) {
   viewer {
     login name bio company location websiteUrl avatarUrl(size: 160)
-    organizations(first: 100) { nodes { login } }
+    organizations(first: 100, after: $organizationsCursor) { nodes { login } pageInfo { hasNextPage endCursor } }
     repositories(
       first: 100
       ownerAffiliations: [OWNER]
       orderBy: { field: UPDATED_AT, direction: DESC }
-    ) { nodes { ...ReadmeRepository } }
+      after: $repositoriesCursor
+    ) { nodes { ...ReadmeRepository } pageInfo { hasNextPage endCursor } }
     contributionsCollection(from: $from, to: $to) {
       startedAt endedAt
       totalCommitContributions totalIssueContributions
@@ -44,8 +46,9 @@ query ReadmeAutoUpdateSnapshot($from: DateTime!, $to: DateTime!) {
         repository { ...ReadmeRepository }
         contributions(first: 1) { totalCount }
       }
-      issueContributions(first: 100) {
-        nodes { issue { repository { ...ReadmeRepository } } }
+      issueContributions(first: 100, after: $issuesCursor) {
+        nodes { issue { id repository { ...ReadmeRepository } } }
+        pageInfo { hasNextPage endCursor }
       }
       pullRequestContributionsByRepository(maxRepositories: 100) {
         repository { ...ReadmeRepository }
@@ -59,6 +62,50 @@ query ReadmeAutoUpdateSnapshot($from: DateTime!, $to: DateTime!) {
   }
 }
 """
+
+
+ORGANIZATIONS_PAGE_QUERY = """
+query ReadmeAutoUpdateOrganizations($organizationsCursor: String) {
+  viewer {
+    organizations(first: 100, after: $organizationsCursor) { nodes { login } pageInfo { hasNextPage endCursor } }
+  }
+}
+"""
+
+
+REPOSITORIES_PAGE_QUERY = REPOSITORY_FIELDS + """
+query ReadmeAutoUpdateRepositories($repositoriesCursor: String) {
+  viewer {
+    repositories(
+      first: 100
+      ownerAffiliations: [OWNER]
+      orderBy: { field: UPDATED_AT, direction: DESC }
+      after: $repositoriesCursor
+    ) { nodes { ...ReadmeRepository } pageInfo { hasNextPage endCursor } }
+  }
+}
+"""
+
+
+ISSUES_PAGE_QUERY = REPOSITORY_FIELDS + """
+query ReadmeAutoUpdateIssues($from: DateTime!, $to: DateTime!, $issuesCursor: String) {
+  viewer {
+    contributionsCollection(from: $from, to: $to) {
+      issueContributions(first: 100, after: $issuesCursor) {
+        nodes { issue { id repository { ...ReadmeRepository } } }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+"""
+
+
+MAX_PAGES = 100
+
+
+class PaginationError(RuntimeError, ValueError):
+    """Safe, transport-neutral error for malformed pagination metadata."""
 
 
 def find_token() -> str:
@@ -82,10 +129,10 @@ def find_token() -> str:
     )
 
 
-def graphql(token: str, variables: dict) -> dict:
+def graphql(token: str, variables: dict, query: str = QUERY) -> dict:
     request = urllib.request.Request(
         "https://api.github.com/graphql",
-        data=json.dumps({"query": QUERY, "variables": variables}).encode(),
+        data=json.dumps({"query": query, "variables": variables}).encode(),
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
@@ -97,13 +144,13 @@ def graphql(token: str, variables: dict) -> dict:
         with urllib.request.urlopen(request, timeout=120) as response:
             result = json.loads(response.read().decode())
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode(errors="replace")[:1000]
-        raise RuntimeError(f"GitHub API failed with HTTP {exc.code}: {detail}") from exc
+        # Never include the upstream body: it can contain private repository names.
+        raise RuntimeError(f"GitHub API failed with HTTP {exc.code}") from exc
     except urllib.error.URLError as exc:
-        raise RuntimeError(f"GitHub API failed: {exc.reason}") from exc
+        raise RuntimeError("GitHub API failed (network error)") from exc
     if result.get("errors"):
-        messages = "; ".join(item.get("message", "GraphQL error") for item in result["errors"])
-        raise RuntimeError(f"GitHub GraphQL error: {messages[:1000]}")
+        # GraphQL messages can contain private resource names or query details.
+        raise RuntimeError("GitHub GraphQL request failed (upstream error)")
     if not isinstance(result.get("data"), dict):
         raise RuntimeError("GitHub response did not contain data")
     return result["data"]
@@ -126,6 +173,7 @@ def make_repository(node: dict, login: str, organizations: set[str]) -> dict:
         for item in ((node.get("repositoryTopics") or {}).get("nodes") or [])
     ]
     return {
+        "id": text(node.get("id")),
         "name_with_owner": text(node.get("nameWithOwner")),
         "description": text(node.get("description")),
         "url": text(node.get("url")),
@@ -159,6 +207,7 @@ def private_aggregate(repositories: list[dict], restricted: int) -> dict | None:
     if not total:
         return None
     return {
+        "id": "",
         "name_with_owner": "Private work",
         "description": "Private repository activity; names and repository content are hidden.",
         "url": "",
@@ -185,6 +234,8 @@ def parse_account(data: dict, options: argparse.Namespace) -> dict:
     login = text(viewer.get("login"))
     if not login:
         raise RuntimeError("The credential did not resolve to a GitHub user account")
+    if data.get("__organizations_complete") is False:
+        raise RuntimeError("GitHub organization collection is incomplete; refusing classification")
     organizations = {
         text(node.get("login"))
         for node in ((viewer.get("organizations") or {}).get("nodes") or [])
@@ -194,10 +245,16 @@ def parse_account(data: dict, options: argparse.Namespace) -> dict:
 
     def get_repository(node: dict) -> dict | None:
         name = text(node.get("nameWithOwner"))
-        if not name:
+        identity = text(node.get("id"))
+        if not name and not identity:
             return None
-        repositories.setdefault(name, make_repository(node, login, organizations))
-        return repositories[name]
+        key = f"id:{identity.casefold()}" if identity else f"name:{name.casefold()}"
+        fallback_key = f"name:{name.casefold()}"
+        if identity and key not in repositories and fallback_key in repositories:
+            repositories[key] = repositories.pop(fallback_key)
+        if key not in repositories:
+            repositories[key] = make_repository(node, login, organizations)
+        return repositories[key]
 
     if options.include_owned:
         for node in (viewer.get("repositories") or {}).get("nodes") or []:
@@ -216,10 +273,15 @@ def parse_account(data: dict, options: argparse.Namespace) -> dict:
                 repository[counter] += int(
                     ((group or {}).get("contributions") or {}).get("totalCount") or 0
                 )
+    issue_seen: set[str] = set()
     for node in (contributions.get("issueContributions") or {}).get("nodes") or []:
-        repository = get_repository(
-            ((node or {}).get("issue") or {}).get("repository") or {}
-        )
+        issue = (node or {}).get("issue") or {}
+        identity = text(issue.get("id"))
+        if identity:
+            if identity in issue_seen:
+                continue
+            issue_seen.add(identity)
+        repository = get_repository(issue.get("repository") or {})
         if repository:
             repository["issues"] += 1
 
@@ -312,6 +374,69 @@ def parse_account(data: dict, options: argparse.Namespace) -> dict:
     }
 
 
+def next_page(connection: dict, label: str, seen: set[str], *, required: bool = False) -> str | None:
+    if not isinstance(connection, dict):
+        raise PaginationError(f"GitHub pagination for {label} returned a missing connection")
+    page_info = connection.get("pageInfo")
+    if page_info is None:
+        if required:
+            raise PaginationError(f"GitHub pagination for {label} returned missing pageInfo")
+        return None  # Legacy parser-only fixtures.
+    if (not isinstance(page_info, dict) or
+            not isinstance(page_info.get("hasNextPage"), bool) or
+            "endCursor" not in page_info or
+            (page_info.get("endCursor") is not None and not isinstance(page_info.get("endCursor"), str))):
+        raise PaginationError(f"GitHub pagination for {label} returned invalid pageInfo")
+    if not page_info.get("hasNextPage"):
+        return None
+    cursor = page_info.get("endCursor")
+    if not isinstance(cursor, str) or not cursor:
+        raise PaginationError(f"GitHub pagination for {label} reported hasNextPage without a cursor")
+    if cursor in seen:
+        raise PaginationError(f"GitHub pagination for {label} repeated cursor")
+    seen.add(cursor)
+    return cursor
+
+
+def paginate(token: str, container: dict, field: str, query: str, page_variables) -> None:
+    connection = container.get(field)
+    if not isinstance(connection, dict):
+        raise PaginationError(f"GitHub pagination for {field} returned a missing connection")
+    nodes = list(connection.get("nodes") or [])
+    seen: set[str] = set()
+    pages = 0
+    cursor = next_page(connection, field, seen, required=True)
+    while cursor:
+        pages += 1
+        if pages > MAX_PAGES:
+            raise PaginationError(f"GitHub pagination for {field} exceeded {MAX_PAGES} pages")
+        page_viewer = graphql(token, page_variables(cursor), query).get("viewer") or {}
+        page_container = page_viewer if field != "issueContributions" else (page_viewer.get("contributionsCollection") or {})
+        page_connection = page_container.get(field)
+        if not isinstance(page_connection, dict):
+            raise PaginationError(f"GitHub pagination for {field} returned a missing connection")
+        nodes.extend(page_connection.get("nodes") or [])
+        cursor = next_page(page_connection, field, seen, required=True)
+    connection["nodes"] = nodes
+    container[field] = connection
+
+
+def paginated_account(token: str, variables: dict, include_owned: bool = True) -> dict:
+    data = graphql(token, variables)
+    viewer = data.get("viewer") or {}
+    paginate(token, viewer, "organizations", ORGANIZATIONS_PAGE_QUERY,
+             lambda cursor: {"organizationsCursor": cursor})
+    if include_owned:
+        paginate(token, viewer, "repositories", REPOSITORIES_PAGE_QUERY,
+                 lambda cursor: {"repositoriesCursor": cursor})
+    contributions = viewer.get("contributionsCollection")
+    if isinstance(contributions, dict):
+        paginate(token, contributions, "issueContributions", ISSUES_PAGE_QUERY,
+                 lambda cursor: {"from": variables.get("from"), "to": variables.get("to"), "issuesCursor": cursor})
+    data["__organizations_complete"] = True
+    return data
+
+
 def bounded_integer(name: str, minimum: int, maximum: int):
     def parse(value: str) -> int:
         try:
@@ -361,7 +486,7 @@ def main() -> int:
         "to": now.isoformat().replace("+00:00", "Z"),
     }
     try:
-        result = parse_account(graphql(find_token(), variables), options)
+        result = parse_account(paginated_account(find_token(), variables, options.include_owned), options)
         rendered = json.dumps(result, indent=2, ensure_ascii=False) + "\n"
         if options.output == "-":
             sys.stdout.write(rendered)
