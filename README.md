@@ -1,5 +1,10 @@
 # README Auto Update
 
+[![Release](https://img.shields.io/github/v/release/wuisabel-gif/readme-auto-update?sort=semver&color=0c7a8c)](https://github.com/wuisabel-gif/readme-auto-update/releases)
+[![CI](https://github.com/wuisabel-gif/readme-auto-update/actions/workflows/ci.yml/badge.svg)](https://github.com/wuisabel-gif/readme-auto-update/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-12a5bb)](https://wuisabel-gif.github.io/readme-auto-update/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 README Auto Update is an agent skill for Claude Code and Codex that creates and refreshes project
 or GitHub profile READMEs from repository evidence. It can understand local code, owned
 repositories, organization work, open-source contributions, and privacy-safe private contribution
@@ -181,8 +186,18 @@ identity remains hidden unless `show_private_names` is explicitly enabled.
 
 ## Optional automatic updates
 
-After the interactive workflow is working, the included GitHub Action can update a profile README
-on a schedule. Add these repository secrets under **Settings → Secrets and variables → Actions**:
+The included GitHub Action keeps a profile README current on a schedule. Add it to any repository
+in a few lines:
+
+```yaml
+- uses: wuisabel-gif/readme-auto-update@v1
+  with:
+    github_token: ${{ secrets.README_AUTO_UPDATE_GITHUB_TOKEN }}
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}   # or anthropic_api_key, or omit for rules mode
+```
+
+The full scheduled setup follows. Add these repository secrets under
+**Settings → Secrets and variables → Actions**:
 
 - `README_AUTO_UPDATE_GITHUB_TOKEN` — user-authorized token for account discovery
 - `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` — optional; either one enables the Action's AI writer
