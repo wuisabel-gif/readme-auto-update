@@ -75,6 +75,16 @@
   }
   @keyframes pulse { 0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent-2) 60%,transparent);} 70%{box-shadow:0 0 0 7px transparent;} 100%{box-shadow:0 0 0 0 transparent;} }
   @media (prefers-reduced-motion: reduce) { .livechip .pulse { animation: none; } }
+  .headright { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+  .repolink {
+    font-family: var(--mono); font-size: 12.5px; font-weight: 600; white-space: nowrap;
+    color: var(--accent-ink); background: var(--accent-wash);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    padding: 8px 13px; border-radius: 8px; text-decoration: none;
+    transition: background .14s ease, color .14s ease, border-color .14s ease;
+  }
+  .repolink:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .repolink:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 
   /* ---------- layout ---------- */
   .layout {
@@ -239,7 +249,10 @@
       <h1>Your profile, built from evidence</h1>
       <p>Real GitHub data on the right. The controls are the tool's actual inputs — flip them and watch the profile README regenerate. Private repo names never appear.</p>
     </div>
-    <span class="livechip"><span class="pulse"></span> @wuisabel-gif · live preview</span>
+    <div class="headright">
+      <span class="livechip"><span class="pulse"></span> @wuisabel-gif · live preview</span>
+      <a class="repolink" href="https://github.com/wuisabel-gif/readme-auto-update" target="_blank" rel="noopener">View on GitHub ↗</a>
+    </div>
   </header>
 
   <div class="layout">
@@ -294,6 +307,7 @@
         Every combination comes from one privacy-filtered run. In the real tool these map to the
         Action inputs (<code>include_*</code>, <code>prompt</code>) or a one-line request in an
         interactive session. Private work stays anonymized in all of them.
+        <br><br>Built with <a href="https://github.com/wuisabel-gif/readme-auto-update" target="_blank" rel="noopener">README&nbsp;Auto&nbsp;Update</a> — grab the tool, skill, and GitHub Action on GitHub.
       </p>
     </aside>
 
