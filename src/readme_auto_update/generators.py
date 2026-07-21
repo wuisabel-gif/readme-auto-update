@@ -23,11 +23,16 @@ def _repository_line(repository: RepositorySummary) -> str:
     details = ", ".join(activity) or "portfolio repository"
     language = f" · {repository.language}" if repository.language else ""
     description = f" — {repository.description}" if repository.description else ""
-    if repository.url:
+    fork = ""
+    if repository.is_fork and repository.parent_name_with_owner:
+        target = repository.parent_url or repository.url
+        name = f"[{repository.parent_name_with_owner}]({target})"
+        fork = " · via fork"
+    elif repository.url:
         name = f"[{repository.name_with_owner}]({repository.url})"
     else:
         name = f"**{repository.name_with_owner}**"
-    return f"- {name}{language} · {details}{description}"
+    return f"- {name}{language} · {details}{fork}{description}"
 
 
 def rules_summary(snapshot: AccountSnapshot) -> str:
@@ -80,7 +85,9 @@ or the existing profile support it. Treat contribution counts as evidence for se
 ordering work, not as the personality of the page. Describe projects through the problem they
 solve, what changes for the user, and the implementation only when those facts are supported.
 Include owned projects, organization work, open-source contributions, and private work only when
-each category exists in the evidence.
+each category exists in the evidence. A repository whose is_fork is true and that has a parent is
+an open-source contribution to that parent project, not the person's own project: describe it as
+contributing to the parent, and link the parent repository rather than the fork.
 Private entries whose name is "Private work" are intentionally anonymized: never infer or invent
 their repository names, organizations, clients, technologies, or purpose. Do not overstate impact,
 intent, motivation, completion, employment, or technical ownership. Prefer specific repository

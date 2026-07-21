@@ -21,6 +21,7 @@ fragment ReadmeRepository on Repository {
   nameWithOwner description url isPrivate isArchived isFork
   stargazerCount forkCount updatedAt
   owner { login }
+  parent { nameWithOwner url }
   primaryLanguage { name }
   repositoryTopics(first: 10) { nodes { topic { name } } }
 }
@@ -172,6 +173,7 @@ def make_repository(node: dict, login: str, organizations: set[str]) -> dict:
         text(((item or {}).get("topic") or {}).get("name"))
         for item in ((node.get("repositoryTopics") or {}).get("nodes") or [])
     ]
+    parent = node.get("parent") or {}
     return {
         "id": text(node.get("id")),
         "name_with_owner": text(node.get("nameWithOwner")),
@@ -182,6 +184,8 @@ def make_repository(node: dict, login: str, organizations: set[str]) -> dict:
         "is_private": bool(node.get("isPrivate")),
         "is_archived": bool(node.get("isArchived")),
         "is_fork": bool(node.get("isFork")),
+        "parent_name_with_owner": text(parent.get("nameWithOwner")),
+        "parent_url": text(parent.get("url")),
         "language": text((node.get("primaryLanguage") or {}).get("name")),
         "topics": [topic for topic in topics if topic],
         "stars": int(node.get("stargazerCount") or 0),
@@ -216,6 +220,8 @@ def private_aggregate(repositories: list[dict], restricted: int) -> dict | None:
         "is_private": True,
         "is_archived": False,
         "is_fork": False,
+        "parent_name_with_owner": "",
+        "parent_url": "",
         "language": "",
         "topics": [],
         "stars": 0,
@@ -291,6 +297,13 @@ def parse_account(data: dict, options: argparse.Namespace) -> dict:
     for repository in repositories.values():
         if repository["is_archived"] and not options.include_archived:
             continue
+        # An owned fork is not an original project. When it carries contribution
+        # activity it is an open-source contribution to its upstream; an inert
+        # fork is neither and is dropped.
+        if repository["is_fork"] and repository["relationship"] == "owned":
+            if activity(repository) == 0:
+                continue
+            repository["relationship"] = "open_source"
         relationship = repository["relationship"]
         if relationship == "owned" and not options.include_owned:
             continue

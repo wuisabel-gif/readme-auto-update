@@ -39,6 +39,9 @@ catalogs unless requested.
 - Label a next step as an inference unless a roadmap, issue, or explicit user instruction supports
   it.
 - Use “contributed to” when scope is unclear; do not imply sole authorship.
+- Treat a fork the person contributed to as an open-source contribution to its upstream
+  (parent) project: link the parent and describe the contribution, not the fork as an original
+  project. An owned fork with no contribution activity is neither a project nor a contribution.
 - Do not equate commit count with impact.
 - Do not expose private identity through contextual clues after names have been redacted.
 
