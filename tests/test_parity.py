@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from readme_auto_update.snapshot import _paged_account, parse_account as action_parse
 from test_skill_scripts import github_snapshot
-from test_snapshot import config, response_data
+from test_snapshot import config, fork_response_data, response_data
 
 
 class ParityTests(unittest.TestCase):
@@ -43,6 +43,12 @@ class ParityTests(unittest.TestCase):
 
     def test_repository_cap_matches(self):
         self.assert_parity(max_repositories=1)
+
+    def test_fork_reclassification_matches(self):
+        cfg = config()
+        expected = json.loads(action_parse(fork_response_data(), cfg).as_prompt_text())
+        actual = github_snapshot.parse_account(fork_response_data(), cfg)
+        self.assertEqual(actual, expected)
 
     def test_paginated_fixtures_have_action_skill_parity(self):
         initial = response_data()

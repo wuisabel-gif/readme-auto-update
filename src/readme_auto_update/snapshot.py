@@ -21,6 +21,7 @@ fragment RepositoryEvidence on Repository {
   forkCount
   updatedAt
   owner { login }
+  parent { nameWithOwner url }
   primaryLanguage { name }
   repositoryTopics(first: 10) { nodes { topic { name } } }
 }
@@ -147,6 +148,8 @@ class RepositorySummary:
     forks: int
     updated_at: str
     id: str = ""
+    parent_name_with_owner: str = ""
+    parent_url: str = ""
     commits: int = 0
     pull_requests: int = 0
     issues: int = 0
@@ -211,6 +214,7 @@ def _repository(node: dict, login: str, organizations: set[str]) -> RepositorySu
         _text(((item or {}).get("topic") or {}).get("name"))
         for item in ((node.get("repositoryTopics") or {}).get("nodes") or [])
     )
+    parent = node.get("parent") or {}
     return RepositorySummary(
         id=_text(node.get("id")),
         name_with_owner=_text(node.get("nameWithOwner")),
@@ -221,6 +225,8 @@ def _repository(node: dict, login: str, organizations: set[str]) -> RepositorySu
         is_private=bool(node.get("isPrivate")),
         is_archived=bool(node.get("isArchived")),
         is_fork=bool(node.get("isFork")),
+        parent_name_with_owner=_text(parent.get("nameWithOwner")),
+        parent_url=_text(parent.get("url")),
         language=_text((node.get("primaryLanguage") or {}).get("name")),
         topics=tuple(topic for topic in topics if topic),
         stars=int(node.get("stargazerCount") or 0),
@@ -346,6 +352,13 @@ def parse_account(data: dict, config: Config) -> AccountSnapshot:
     for repository in all_repositories:
         if repository.is_archived and not config.include_archived:
             continue
+        # An owned fork is not an original project. When it carries contribution
+        # activity it is an open-source contribution to its upstream; an inert
+        # fork is neither and is dropped.
+        if repository.is_fork and repository.relationship == "owned":
+            if repository.contributions == 0:
+                continue
+            repository.relationship = "open_source"
         if repository.relationship == "owned" and not config.include_owned:
             continue
         if repository.relationship == "organization" and not config.include_organizations:

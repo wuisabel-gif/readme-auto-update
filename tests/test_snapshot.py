@@ -36,20 +36,58 @@ def config(**overrides) -> Config:
     return replace(base, **overrides)
 
 
-def repo(name, owner, *, private=False, archived=False):
-    return {
+def repo(name, owner, *, private=False, archived=False, fork=False, parent=None):
+    node = {
         "nameWithOwner": name,
         "description": f"Description for {name}",
         "url": f"https://github.com/{name}",
         "isPrivate": private,
         "isArchived": archived,
-        "isFork": False,
+        "isFork": fork,
         "stargazerCount": 3,
         "forkCount": 1,
         "updatedAt": "2026-07-10T00:00:00Z",
         "owner": {"login": owner},
         "primaryLanguage": {"name": "Python"},
         "repositoryTopics": {"nodes": [{"topic": {"name": "tools"}}]},
+    }
+    if parent:
+        node["parent"] = {"nameWithOwner": parent, "url": f"https://github.com/{parent}"}
+    return node
+
+
+def fork_response_data():
+    active = repo("example-user/awesome-fork", "example-user", fork=True, parent="upstream-org/awesome")
+    dead = repo("example-user/dead-fork", "example-user", fork=True, parent="someone/dead")
+    return {
+        "viewer": {
+            "login": "example-user",
+            "name": "Example User",
+            "bio": "",
+            "company": "",
+            "location": "",
+            "websiteUrl": "",
+            "avatarUrl": "",
+            "organizations": {"nodes": []},
+            "repositories": {"nodes": [active, dead]},
+            "contributionsCollection": {
+                "startedAt": "2025-07-15T00:00:00Z",
+                "endedAt": "2026-07-15T00:00:00Z",
+                "totalCommitContributions": 6,
+                "totalIssueContributions": 0,
+                "totalPullRequestContributions": 0,
+                "totalPullRequestReviewContributions": 0,
+                "totalRepositoryContributions": 0,
+                "restrictedContributionsCount": 0,
+                "hasAnyRestrictedContributions": False,
+                "commitContributionsByRepository": [
+                    {"repository": active, "contributions": {"totalCount": 6}},
+                ],
+                "issueContributions": {"nodes": []},
+                "pullRequestContributionsByRepository": [],
+                "pullRequestReviewContributionsByRepository": [],
+            },
+        }
     }
 
 
@@ -157,6 +195,29 @@ class SnapshotTests(unittest.TestCase):
         private = next(repository for repository in snapshot.repositories if repository.relationship == "private")
         self.assertEqual(private.contributions, 5)
         self.assertEqual(snapshot.private_contributions, 5)
+
+    def test_active_owned_fork_becomes_open_source_contribution(self):
+        snapshot = parse_account(fork_response_data(), config())
+        forks = [
+            repository
+            for repository in snapshot.repositories
+            if repository.parent_name_with_owner == "upstream-org/awesome"
+        ]
+        self.assertEqual(len(forks), 1)
+        self.assertEqual(forks[0].relationship, "open_source")
+        self.assertEqual(forks[0].commits, 6)
+        self.assertEqual(forks[0].parent_url, "https://github.com/upstream-org/awesome")
+
+    def test_inactive_owned_fork_is_dropped(self):
+        snapshot = parse_account(fork_response_data(), config())
+        names = {repository.name_with_owner for repository in snapshot.repositories}
+        self.assertNotIn("example-user/dead-fork", names)
+
+    def test_fork_contribution_follows_open_source_toggle(self):
+        snapshot = parse_account(fork_response_data(), config(include_open_source=False))
+        self.assertFalse(
+            any(r.parent_name_with_owner == "upstream-org/awesome" for r in snapshot.repositories)
+        )
 
     def test_pagination_rejects_missing_and_repeated_cursors(self):
         with self.assertRaisesRegex(ValueError, "without a cursor"):
