@@ -6,6 +6,15 @@
 [![Live demo](https://img.shields.io/badge/demo-live-12a5bb)](https://wuisabel-gif.github.io/readme-auto-update/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+**Create and refresh evidence-based READMEs — a project's or your GitHub profile's — from real
+repository activity, while every hand-written section stays exactly as you left it.**
+
+▶ **[Live demo](https://wuisabel-gif.github.io/readme-auto-update/)** &nbsp;·&nbsp;
+🛠️ **[GitHub Marketplace](https://github.com/marketplace/actions/readme-auto-update)** &nbsp;·&nbsp;
+📦 Works in **Claude Code** & **Codex**
+
+---
+
 README Auto Update is an agent skill for Claude Code and Codex that creates and refreshes project
 or GitHub profile READMEs from repository evidence. It can understand local code, owned
 repositories, organization work, open-source contributions, and privacy-safe private contribution
