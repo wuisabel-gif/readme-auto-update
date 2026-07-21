@@ -1,5 +1,6 @@
 # README Auto Update
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-README_Auto_Update-2ea44f?logo=github&logoColor=white)](https://github.com/marketplace/actions/readme-auto-update)
 [![Release](https://img.shields.io/github/v/release/wuisabel-gif/readme-auto-update?sort=semver&color=0c7a8c)](https://github.com/wuisabel-gif/readme-auto-update/releases)
 [![CI](https://github.com/wuisabel-gif/readme-auto-update/actions/workflows/ci.yml/badge.svg)](https://github.com/wuisabel-gif/readme-auto-update/actions/workflows/ci.yml)
 [![Live demo](https://img.shields.io/badge/demo-live-12a5bb)](https://wuisabel-gif.github.io/readme-auto-update/)
@@ -186,8 +187,9 @@ identity remains hidden unless `show_private_names` is explicitly enabled.
 
 ## Optional automatic updates
 
-The included GitHub Action keeps a profile README current on a schedule. Add it to any repository
-in a few lines:
+The included GitHub Action — on the
+[GitHub Marketplace](https://github.com/marketplace/actions/readme-auto-update) — keeps a profile
+README current on a schedule. Add it to any repository in a few lines:
 
 ```yaml
 - uses: wuisabel-gif/readme-auto-update@v1
