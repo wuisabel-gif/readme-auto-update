@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>README Auto Update — live demo</title>
+<style>
+  :root {
+    --bg: #e7ebf0; --panel: #ffffff; --rail: #f2f5f8;
+    --ink: #1b2027; --muted: #566372; --faint: #8794a3;
+    --border: #d2dae2; --line: #e6ebf0;
+    --accent: #0c7a8c; --accent-2: #12a5bb; --accent-wash: #daeef1; --accent-ink: #085362;
+    --link: #0969da; --ok: #1a7f37;
+    --shadow: 0 1px 2px rgba(27,32,39,.05), 0 12px 34px rgba(27,32,39,.09);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #05080c; --panel: #0d1117; --rail: #0b1119;
+      --ink: #e6edf3; --muted: #9aa5b1; --faint: #6b7684;
+      --border: #232c36; --line: #1a222b;
+      --accent: #2bc2d6; --accent-2: #4fd6e8; --accent-wash: #0e2a31; --accent-ink: #86e2f0;
+      --link: #4493f8; --ok: #3fb950;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#e7ebf0; --panel:#fff; --rail:#f2f5f8; --ink:#1b2027; --muted:#566372; --faint:#8794a3;
+    --border:#d2dae2; --line:#e6ebf0; --accent:#0c7a8c; --accent-2:#12a5bb; --accent-wash:#daeef1;
+    --accent-ink:#085362; --link:#0969da; --ok:#1a7f37;
+    --shadow:0 1px 2px rgba(27,32,39,.05), 0 12px 34px rgba(27,32,39,.09);
+  }
+  :root[data-theme="dark"] {
+    --bg:#05080c; --panel:#0d1117; --rail:#0b1119; --ink:#e6edf3; --muted:#9aa5b1; --faint:#6b7684;
+    --border:#232c36; --line:#1a222b; --accent:#2bc2d6; --accent-2:#4fd6e8; --accent-wash:#0e2a31;
+    --accent-ink:#86e2f0; --link:#4493f8; --ok:#3fb950;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.55);
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .app {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--ui); min-height: 100vh;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    border-bottom: 1px solid var(--border);
+    padding: 20px clamp(16px, 4vw, 40px);
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+    background: color-mix(in srgb, var(--panel) 55%, var(--bg));
+  }
+  .brand .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 7px; display: flex; align-items: center; gap: 9px;
+  }
+  .brand .eyebrow::before { content: ""; width: 22px; height: 1px; background: var(--accent); opacity: .8; }
+  .brand h1 {
+    font-family: var(--mono); font-size: clamp(20px, 3vw, 27px); font-weight: 600;
+    letter-spacing: -.01em; margin: 0;
+  }
+  .brand p { margin: 6px 0 0; color: var(--muted); font-size: 14px; max-width: 52ch; }
+  .livechip {
+    font-family: var(--mono); font-size: 11.5px; color: var(--accent-ink);
+    background: var(--accent-wash); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+    padding: 6px 11px; border-radius: 100px; display: inline-flex; align-items: center; gap: 8px;
+    white-space: nowrap;
+  }
+  .livechip .pulse {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--accent-2);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-2) 70%, transparent);
+    animation: pulse 2.4s ease-out infinite;
+  }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent-2) 60%,transparent);} 70%{box-shadow:0 0 0 7px transparent;} 100%{box-shadow:0 0 0 0 transparent;} }
+  @media (prefers-reduced-motion: reduce) { .livechip .pulse { animation: none; } }
+
+  /* ---------- layout ---------- */
+  .layout {
+    display: grid; grid-template-columns: 320px minmax(0, 1fr);
+    gap: 0; align-items: start;
+  }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  /* ---------- control rail ---------- */
+  .rail {
+    background: var(--rail); border-right: 1px solid var(--border);
+    padding: 22px clamp(16px, 2.4vw, 24px) 40px;
+    position: sticky; top: 0; align-self: start;
+    min-height: calc(100vh - 90px);
+  }
+  @media (max-width: 860px) { .rail { position: static; min-height: 0; border-right: 0; border-bottom: 1px solid var(--border); } }
+  .grouplabel {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--faint); margin: 22px 0 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .grouplabel:first-child { margin-top: 0; }
+  .grouplabel .n { color: var(--accent); }
+
+  .seg { display: flex; flex-direction: column; gap: 6px; }
+  .segbtn {
+    display: flex; flex-direction: column; gap: 2px; text-align: left; width: 100%;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 9px;
+    padding: 10px 12px; cursor: pointer; color: var(--ink); font-family: var(--ui);
+    transition: border-color .14s ease, background .14s ease;
+  }
+  .segbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .segbtn .t { font-size: 13.5px; font-weight: 600; }
+  .segbtn .d { font-size: 11.5px; color: var(--muted); }
+  .segbtn[aria-pressed="true"] {
+    border-color: var(--accent); background: var(--accent-wash);
+  }
+  .segbtn[aria-pressed="true"] .t { color: var(--accent-ink); }
+
+  .checks { display: flex; flex-direction: column; gap: 2px; }
+  .check {
+    display: flex; align-items: center; gap: 11px; padding: 8px 6px; border-radius: 8px;
+    cursor: pointer; user-select: none;
+  }
+  .check:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+  .check input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .box {
+    width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border);
+    background: var(--panel); flex: none; display: grid; place-items: center;
+    transition: background .14s ease, border-color .14s ease;
+  }
+  .box svg { width: 12px; height: 12px; stroke: #fff; stroke-width: 3; fill: none; opacity: 0; }
+  .check input:checked + .box { background: var(--accent); border-color: var(--accent); }
+  .check input:checked + .box svg { opacity: 1; }
+  .check input:focus-visible + .box { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+  .check .lab { font-size: 13.5px; }
+  .check .lab small { display: block; color: var(--muted); font-size: 11.5px; }
+  .check.locked { opacity: .42; cursor: not-allowed; }
+
+  .railnote {
+    margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--muted); line-height: 1.5;
+  }
+  .railnote code { font-family: var(--mono); font-size: 11.5px; background: color-mix(in srgb, var(--ink) 7%, transparent); padding: 1px 5px; border-radius: 4px; }
+
+  /* ---------- preview stage ---------- */
+  .stage { padding: clamp(18px, 3vw, 40px); }
+  .browser {
+    max-width: 820px; margin: 0 auto;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .browser .chrome {
+    display: flex; align-items: center; gap: 9px; padding: 11px 16px;
+    border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 45%, var(--panel));
+    font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+  }
+  .browser .chrome .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--border); }
+  .browser .chrome .url { margin-left: 6px; color: var(--ink); }
+  .browser .chrome .url b { color: var(--accent-ink); font-weight: 600; }
+  .tabline {
+    display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--line);
+    font-size: 12.5px; color: var(--muted); font-family: var(--mono);
+  }
+  .tabline span { padding: 9px 10px; border-bottom: 2px solid transparent; }
+  .tabline .active { color: var(--ink); border-bottom-color: var(--accent); }
+
+  /* ---------- markdown render ---------- */
+  .md { padding: 28px clamp(20px, 4vw, 40px) 34px; font-size: 15px; animation: fade .35s ease; }
+  @media (prefers-reduced-motion: reduce) { .md { animation: none; } }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: none; } }
+  .md > :first-child { margin-top: 0; }
+  .md h1 { font-size: 25px; font-weight: 680; margin: 0 0 4px; letter-spacing: -.01em; }
+  .md .tagline { color: var(--muted); margin: 0 0 16px; font-size: 14.5px; }
+  .md h2 {
+    font-size: 17px; font-weight: 660; margin: 26px 0 12px; padding-bottom: 7px;
+    border-bottom: 1px solid var(--line);
+  }
+  .md h3 { font-size: 13px; font-weight: 660; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 9px; }
+  .md p { margin: 0 0 12px; }
+  .md p.lead { font-size: 16px; }
+  .md .sub, .md p.dim { color: var(--muted); }
+  .md a { color: var(--link); text-decoration: none; font-weight: 500; }
+  .md a:hover { text-decoration: underline; }
+  .md ul { margin: 0 0 12px; padding-left: 20px; }
+  .md li { margin: 8px 0; }
+  .md strong { font-weight: 640; }
+  .md .stamp { display: block; margin-top: 22px; color: var(--faint); font-size: 12.5px; }
+  .badge {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 600;
+    letter-spacing: .04em; text-transform: uppercase; vertical-align: middle;
+    color: var(--accent-ink); background: var(--accent-wash);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    padding: 1px 6px; border-radius: 5px; margin-left: 6px;
+  }
+  .statrow { display: flex; flex-wrap: wrap; gap: 10px; margin: 2px 0 18px; }
+  .stat { border: 1px solid var(--line); border-radius: 9px; padding: 9px 13px; min-width: 90px; }
+  .stat .n { font-family: var(--mono); font-size: 18px; font-weight: 640; font-variant-numeric: tabular-nums; }
+  .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 1px; }
+  .tablewrap { overflow-x: auto; margin: 2px 0 14px; }
+  table.proj { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.proj td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.proj td.lang { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; text-align: right; }
+  table.proj tr:last-child td { border-bottom: 0; }
+  .grp { font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); padding: 14px 12px 4px !important; }
+  .empty { color: var(--faint); font-size: 13.5px; font-style: italic; }
+  .md .typing { margin: 4px 0 16px; }
+  .md .typing img { max-width: 100%; height: auto; }
+  .md .cards { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 14px; align-items: flex-start; }
+  .md .cards img { max-width: 100%; height: auto; border-radius: 8px; }
+  .md .dynimg { display: block; max-width: 100%; height: auto; margin: 0 0 16px; border-radius: 8px; }
+  .md .credits { font-size: 12px; color: var(--faint); margin-top: 20px; line-height: 1.55; }
+  .md .credits a { color: var(--muted); }
+  /* badges + icons */
+  .md .badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 16px; }
+  .md .badges img { height: 26px; }
+  .md .iconwrap { margin: 6px 0 16px; }
+  .md .iconwrap img { max-width: 100%; }
+  /* retro terminal — commits to its own dark world */
+  .md .term { background: #0a0e0a; border: 1px solid #1f2a1f; border-radius: 10px; overflow: hidden; margin: 4px 0 8px; box-shadow: inset 0 0 60px rgba(0,0,0,.5); }
+  .md .term .tbar { background: #121a12; padding: 8px 12px; display: flex; gap: 7px; align-items: center; border-bottom: 1px solid #1f2a1f; }
+  .md .term .tbar i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .md .term .tbody { font-family: var(--mono); font-size: 13px; line-height: 1.7; color: #8ce6a0; padding: 16px 18px; white-space: pre-wrap; }
+  .md .term .p { color: #4fd6a0; } .md .term .c { color: #e6edf3; } .md .term .m { color: #6b8f74; } .md .term a { color: #7fe0ff; }
+  /* code-block */
+  .md pre.code { background: #0d1117; border: 1px solid #232c36; border-radius: 10px; padding: 18px 20px; overflow-x: auto; margin: 4px 0 14px; }
+  .md pre.code code { font-family: var(--mono); font-size: 13px; line-height: 1.65; color: #c9d1d9; white-space: pre; }
+  .md .kw { color: #ff7b72; } .md .fn { color: #d2a8ff; } .md .st { color: #a5d6ff; } .md .pr { color: #79c0ff; } .md .cm { color: #8b949e; }
+  /* game board */
+  .md .board { display: grid; grid-template-columns: repeat(8, 1fr); width: min(360px, 100%); border: 2px solid var(--border-strong, var(--border)); border-radius: 6px; overflow: hidden; margin: 6px 0 14px; }
+  .md .board div { aspect-ratio: 1; display: grid; place-items: center; font-size: clamp(14px, 4.4vw, 22px); }
+  .md .board .lt { background: #eadfca; } .md .board .dk { background: #b58863; }
+  /* themed banner */
+  .md .banner { margin: -6px 0 16px; } .md .banner img { width: 100%; height: auto; display: block; border-radius: 10px; }
+  .md .funfacts li { margin: 6px 0; } .md .center { text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <p class="eyebrow">README Auto Update · live demo</p>
+      <h1>Your profile, built from evidence</h1>
+      <p>Real GitHub data on the right. The controls are the tool's actual inputs — flip them and watch the profile README regenerate. Private repo names never appear.</p>
+    </div>
+    <span class="livechip"><span class="pulse"></span> @wuisabel-gif · live preview</span>
+  </header>
+
+  <div class="layout">
+    <aside class="rail">
+      <div class="grouplabel"><span class="n">01</span> Display style</div>
+      <div class="seg" id="styles">
+        <button class="segbtn" data-style="narrative" aria-pressed="true">
+          <span class="t">Narrative + catalog</span><span class="d">The builder's story, grouped by theme</span>
+        </button>
+        <button class="segbtn" data-style="table" aria-pressed="false">
+          <span class="t">Compact table</span><span class="d">Dense, scannable index of projects</span>
+        </button>
+        <button class="segbtn" data-style="minimal" aria-pressed="false">
+          <span class="t">Minimalist</span><span class="d">Clean type, three highlights, a door</span>
+        </button>
+        <button class="segbtn" data-style="dynamic" aria-pressed="false">
+          <span class="t">Dynamic / live stats</span><span class="d">Typing header, stat cards, activity graph</span>
+        </button>
+        <button class="segbtn" data-style="typing" aria-pressed="false">
+          <span class="t">Typing animation</span><span class="d">Animated SVG header · CyrisXD</span>
+        </button>
+        <button class="segbtn" data-style="badges" aria-pressed="false">
+          <span class="t">Badges</span><span class="d">shields.io tech-stack wall · br3ndonland</span>
+        </button>
+        <button class="segbtn" data-style="icons" aria-pressed="false">
+          <span class="t">Icons</span><span class="d">skillicons.dev grid · terrytangyuan</span>
+        </button>
+        <button class="segbtn" data-style="playful" aria-pressed="false">
+          <span class="t">Playful</span><span class="d">Emoji-forward, fun facts · saadeghi</span>
+        </button>
+        <button class="segbtn" data-style="retro" aria-pressed="false">
+          <span class="t">Retro / terminal</span><span class="d">CRT terminal aesthetic · fnky</span>
+        </button>
+        <button class="segbtn" data-style="codeblock" aria-pressed="false">
+          <span class="t">Code-block</span><span class="d">Profile as a class definition · Thaiane</span>
+        </button>
+        <button class="segbtn" data-style="game" aria-pressed="false">
+          <span class="t">Game mode</span><span class="d">Play-me board via Actions · timburgan</span>
+        </button>
+        <button class="segbtn" data-style="anime" aria-pressed="false">
+          <span class="t">Themed banner</span><span class="d">capsule-render art header · innng</span>
+        </button>
+      </div>
+
+      <div class="grouplabel"><span class="n">02</span> Sections</div>
+      <div class="checks" id="sections"></div>
+
+      <div class="grouplabel"><span class="n">03</span> Privacy &amp; sources</div>
+      <div class="checks" id="privacy"></div>
+
+      <p class="railnote">
+        Every combination comes from one privacy-filtered run. In the real tool these map to the
+        Action inputs (<code>include_*</code>, <code>prompt</code>) or a one-line request in an
+        interactive session. Private work stays anonymized in all of them.
+      </p>
+    </aside>
+
+    <main class="stage">
+      <div class="browser">
+        <div class="chrome">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="url">github.com/<b>wuisabel-gif</b></span>
+        </div>
+        <div class="tabline"><span>Overview</span><span class="active">README.md</span><span>Repositories</span></div>
+        <article class="md" id="readme"></article>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  var U = "https://github.com/wuisabel-gif/";
+  var profile = {
+    intro: "Most of what I build starts with a specific annoyance in my own robotics, embedded, or AI-agent work and turns into something reusable. The through-line isn't a language — it's removing a step that used to be manual: remembering what an agent already learned, keeping AI writing from sounding like AI, or testing a robot before the hardware exists.",
+    stats: { commits: "1,744", prs: "62", repos: "93" }
+  };
+  var highlights = [
+    { e: "🐋", n: "MemoryWhale", u: "https://wuisabel-gif.github.io/MemWhale/", d: "A local-first terminal memory system in Rust and Tauri that records what your command-line agents learn, so the next session starts with context instead of a blank slate." },
+    { e: "✍️", n: "Cadence", u: "https://wuisabel-gif.github.io/Cadence/", d: "Scores prose for the rhythmic tells of machine-generated text and rewrites it in a voice that sounds like you." },
+    { e: "🎛️", n: "Real", u: "https://real-biv8.onrender.com", d: "A prompt-engineering workspace that turns rough ideas into polished, structured prompts." }
+  ];
+  var org = { n: "USC RoboSub", u: "https://usc-robosub.github.io/", d: "Contributing 48 pull requests (25 merged) to the team's ROS 2 autonomous underwater vehicle software and simulation. Most of it lives in private team repositories, so the specifics stay with the team — the public reflection shows up in the robotics projects below." };
+  var openSource = [
+    { n: "rho", u: "https://matthewyjiang.github.io/rho/", d: "Contributed pull requests and issues to this lightweight Rust agent harness while using it on my own projects.", lang: "Rust" }
+  ];
+  var catalog = [
+    { g: "AI agent tooling", n: "Joule", u: "https://wuisabel-gif.github.io/Joule/", d: "Helps AI agents waste less — fewer tokens, less energy per response.", lang: "Rust" },
+    { g: "AI agent tooling", n: "Tokenomist", u: "https://wuisabel-gif.github.io/Tokenomist/", d: "Ranks agents by cost per correct answer on the same task.", lang: "Python" },
+    { g: "AI agent tooling", n: "Delphin", u: "https://wuisabel-gif.github.io/Delphin/", d: "A duplex companion for agent CLIs — talk and listen at once.", lang: "Rust" },
+    { g: "AI agent tooling", n: "chat_mapper", u: "https://chat-mapper.onrender.com", d: "Organizes long AI chat histories into topic threads.", lang: "TypeScript" },
+    { g: "Robotics & simulation", n: "WireDAQ", u: "https://wuisabel-gif.github.io/WireDAQ/", d: "Simulate wire-ready data-acquisition architectures before hardware.", lang: "Python" },
+    { g: "Robotics & simulation", n: "imu-allen-lab", u: "https://wuisabel-gif.github.io/imu-allen-lab/", d: "An online Allan Variance analyzer for ROS 2 IMU data — characterize sensor noise to tune state estimation.", lang: "TypeScript" },
+    { g: "Robotics & simulation", n: "ros2bag_converter", u: "https://wuisabel-gif.github.io/ros2bag_converter/", d: "Convert ROS 2 .db3 bags to CSV/JSON in the browser, no ROS install.", lang: "Python" },
+    { g: "Robotics & simulation", n: "Blue Horizon", u: "https://wuisabel-gif.github.io/Blue_Horizon/", d: "A Go CLI that detects attitude/state-estimation faults from robot logs.", lang: "Go" },
+    { g: "Embedded & electronics", n: "Cello Analyzer", u: "https://wuisabel-gif.github.io/Cello-Analyzer/", d: "A Photon 2 embedded system that monitors a cello as it's played.", lang: "C++" },
+    { g: "Embedded & electronics", n: "plant_saver", u: "https://wuisabel-gif.github.io/plant_saver/", d: "Firmware to characterize a capacitive soil-moisture sensor.", lang: "C++" },
+    { g: "Embedded & electronics", n: "AVRInsight", u: "https://wuisabel-gif.github.io/AVRInsight/", d: "Interactive Arduino UNO R3 / ATmega328P exploration and debugging.", lang: "JavaScript" },
+    { g: "Music & games", n: "Clef-Shift", u: "https://wuisabel-gif.github.io/Clef-Shift/", d: "Translate notes between clefs across instruments with LilyPond.", lang: "Python" },
+    { g: "Music & games", n: "Mood", u: "https://wuisabel-gif.github.io/Mood/", d: "Pick a mood; an algorithm composes a two-voice track in the browser.", lang: "JavaScript" },
+    { g: "Music & games", n: "Neon Breach", u: U + "Top-Down-Shooter", d: "A neon sci-fi top-down roguelike shooter on HTML5 Canvas.", lang: "JavaScript" }
+  ];
+
+  var state = {
+    style: "narrative",
+    highlights: true, org: true, openSource: true, catalog: true, privateWork: true
+  };
+
+  var sectionDefs = [
+    { key: "highlights", t: "Highlights", d: "3 featured projects, explained" },
+    { key: "org", t: "Organization work", d: "USC RoboSub · 48 PRs" },
+    { key: "openSource", t: "Open source", d: "Contributions to others' repos" },
+    { key: "catalog", t: "Themed catalog", d: "The rest, grouped by area" }
+  ];
+  var privacyDefs = [
+    { key: "privateWork", t: "Private work", d: "Minimal style only — specific note" }
+  ];
+
+  function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+  function link(name, url) { return '<a href="' + url + '" target="_blank" rel="noopener">' + esc(name) + "</a>"; }
+  function heading(txt) { return "<h2>" + txt + "</h2>"; }
+
+  function renderHighlights() {
+    var out = heading("⭐ Highlights") + "<ul>";
+    highlights.forEach(function (h) {
+      out += "<li>" + h.e + " <strong>" + link(h.n, h.u) + ".</strong> " + esc(h.d) + "</li>";
+    });
+    return out + "</ul>";
+  }
+  function renderOrg() {
+    return heading("🌊 Organization work") +
+      "<ul><li><strong>" + org.n + " (" + link("usc-robosub", org.u) + ").</strong> " + esc(org.d) + "</li></ul>";
+  }
+  function renderOpenSource() {
+    var out = heading("🤝 Open source") + "<ul>";
+    openSource.forEach(function (o) {
+      out += "<li><strong>" + link(o.n, o.u) + ".</strong> " + esc(o.d) + "</li>";
+    });
+    return out + "</ul>";
+  }
+  function renderCatalog() {
+    var groups = {}, order = [];
+    catalog.forEach(function (r) { if (!groups[r.g]) { groups[r.g] = []; order.push(r.g); } groups[r.g].push(r); });
+    var out = "";
+    order.forEach(function (g) {
+      out += "<h3>" + g + "</h3><ul>";
+      groups[g].forEach(function (r) {
+        out += "<li><strong>" + link(r.n, r.u) + "</strong> — " + esc(r.d) + "</li>";
+      });
+      out += "</ul>";
+    });
+    return out;
+  }
+  function renderPrivate() {
+    return heading("Private work") +
+      '<p class="sub">Beyond the team work above, some recent activity happened in other private repositories. Their names and contents stay hidden; only that the activity exists is noted here.</p>';
+  }
+  function stamp() { return '<span class="stamp">Last updated by README Auto Update on 2026-07-16 UTC.</span>'; }
+
+  function renderNarrative() {
+    var html = "<h1>Hi, I'm Isabel Wu 👋</h1>" +
+      '<p class="tagline">Computer Engineering &amp; Computer Science junior at USC — building for robotics, electronics, and clearer tools.</p>' +
+      '<p class="lead">' + esc(profile.intro) + "</p>";
+    if (state.highlights) html += renderHighlights();
+    if (state.org) html += renderOrg();
+    if (state.openSource) html += renderOpenSource();
+    if (state.catalog) html += renderCatalog();
+    return html + stamp();
+  }
+  function renderTable() {
+    var html = "<h1>Isabel Wu</h1>" +
+      '<p class="tagline">CE/CS junior at USC building for robotics, embedded systems, and AI agents.</p>' +
+      '<div class="statrow">' +
+        '<div class="stat"><div class="n">' + profile.stats.commits + '</div><div class="k">commits / yr</div></div>' +
+        '<div class="stat"><div class="n">' + profile.stats.prs + '</div><div class="k">pull requests</div></div>' +
+        '<div class="stat"><div class="n">' + profile.stats.repos + '</div><div class="k">repositories</div></div>' +
+      "</div>";
+    if (state.highlights) html += renderHighlights();
+    if (state.catalog) {
+      var rows = "";
+      var groups = {}, order = [];
+      catalog.forEach(function (r) { if (!groups[r.g]) { groups[r.g] = []; order.push(r.g); } groups[r.g].push(r); });
+      order.forEach(function (g) {
+        rows += '<tr><td class="grp" colspan="2">' + g + "</td></tr>";
+        groups[g].forEach(function (r) {
+          rows += "<tr><td>" + link(r.n, r.u) + " — " + esc(r.d) + '</td><td class="lang">' + r.lang + "</td></tr>";
+        });
+      });
+      html += heading("Projects") + '<div class="tablewrap"><table class="proj"><tbody>' + rows + "</tbody></table></div>";
+    }
+    if (state.org) html += renderOrg();
+    if (state.openSource) html += renderOpenSource();
+    return html + stamp();
+  }
+  function renderMinimal() {
+    var html = "<h1>Hi, I'm Isabel 👋</h1>" +
+      '<p class="lead">I build tools that make technical work clearer — usually starting from something in my own robotics, embedded, or AI-agent work that I got tired of doing by hand.</p>';
+    if (state.highlights) {
+      html += "<ul>";
+      highlights.forEach(function (h) { html += "<li>" + h.e + " <strong>" + link(h.n, h.u) + "</strong> — " + esc(h.d.split(".")[0]) + ".</li>"; });
+      html += "</ul>";
+    }
+    html += '<p class="sub">More across my <a href="' + U + '?tab=repositories" target="_blank" rel="noopener">repositories</a>.</p>';
+    if (state.privateWork) {
+      html += heading("Private work") +
+        '<p class="sub">Most of my recent work is private — 48 pull requests (25 merged) to <strong>USC RoboSub</strong>\'s ROS 2 autonomous underwater vehicle software and simulation, plus a few other repositories I keep closed. The details stay private.</p>';
+    }
+    return html + stamp();
+  }
+  function renderDynamic() {
+    // Live SVG services, colour-matched to the demo's teal accent. Rendered
+    // from the real username, so each card regenerates on every page load.
+    var user = "wuisabel-gif";
+    var T = "0c7a8c", A = "12a5bb", TXT = "808a99";
+    var typing = "https://readme-typing-svg.demolab.com/?font=Fira+Code&size=22&pause=900&color=" + A +
+      "&center=true&vCenter=true&width=520&height=42&lines=" +
+      encodeURIComponent("Robotics + embedded + AI-agent tools") + ";" +
+      encodeURIComponent("Computer Engineering & CS @ USC") + ";" +
+      encodeURIComponent("48 PRs to USC RoboSub");
+    var stats = "https://github-readme-stats.vercel.app/api?username=" + user +
+      "&show_icons=true&include_all_commits=true&hide_border=true" +
+      "&bg_color=00000000&title_color=" + T + "&icon_color=" + A + "&text_color=" + TXT;
+    var langs = "https://github-readme-stats.vercel.app/api/top-langs/?username=" + user +
+      "&layout=compact&langs_count=8&hide_border=true&bg_color=00000000&title_color=" + T + "&text_color=" + TXT;
+    var streak = "https://streak-stats.demolab.com/?user=" + user +
+      "&hide_border=true&background=00000000&ring=" + T + "&fire=" + A + "&currStreakLabel=" + T + "&sideLabels=" + TXT + "&dates=" + TXT;
+    var graph = "https://github-readme-activity-graph.vercel.app/graph?username=" + user +
+      "&hide_border=true&bg_color=00000000&color=" + T + "&line=" + A + "&point=" + T + "&area=true&area_color=" + A;
+
+    var html = "<h1>Isabel Wu</h1>" +
+      '<p class="typing"><img src="' + typing + '" alt="Robotics + embedded + AI-agent tools" /></p>' +
+      '<div class="cards">' +
+        '<img src="' + stats + '" alt="Isabel Wu\'s GitHub stats" height="165" />' +
+        '<img src="' + langs + '" alt="Top languages" height="165" />' +
+      "</div>" +
+      '<img class="dynimg" src="' + streak + '" alt="Contribution streak" height="165" />' +
+      '<img class="dynimg" src="' + graph + '" alt="Contribution activity graph" />';
+    if (state.highlights) html += renderHighlights();
+    if (state.org) html += renderOrg();
+    if (state.openSource) html += renderOpenSource();
+    html += '<p class="credits">Live cards generated by ' +
+      '<a href="https://github.com/anuraghazra/github-readme-stats" target="_blank" rel="noopener">github-readme-stats</a> (anuraghazra), ' +
+      '<a href="https://github.com/DenverCoder1/readme-typing-svg" target="_blank" rel="noopener">readme-typing-svg</a> &amp; ' +
+      '<a href="https://github.com/DenverCoder1/github-readme-streak-stats" target="_blank" rel="noopener">streak-stats</a> (DenverCoder1), and ' +
+      '<a href="https://github.com/Ashutosh00710/github-readme-activity-graph" target="_blank" rel="noopener">activity-graph</a> (Ashutosh00710) — inspiration for this style.</p>';
+    return html + stamp();
+  }
+
+  var TECH = ["Rust","Python","C++","TypeScript","Go","JavaScript","F#","Julia","Zig","CUDA","ROS 2","Tauri"];
+
+  function renderTyping() {
+    var lines = ["Robotics + embedded + AI-agent tools", "Computer Engineering & CS @ USC",
+      "Local-first memory, humanized AI, ROS 2 sims", "48 PRs to USC RoboSub"];
+    var url = "https://readme-typing-svg.demolab.com/?font=Fira+Code&weight=500&size=26&pause=1000&color="
+      + "12A5BB&center=true&vCenter=true&width=600&height=60&lines=" + lines.map(encodeURIComponent).join(";");
+    var html = '<p class="typing center"><img src="' + url + '" alt="' + esc(lines[0]) + '" /></p>' +
+      '<p class="lead center">Computer Engineering &amp; Computer Science junior at USC.</p>';
+    if (state.highlights) html += renderHighlights();
+    return html + '<p class="credits">Header animated with <a href="https://github.com/DenverCoder1/readme-typing-svg" target="_blank" rel="noopener">readme-typing-svg</a> — inspired by CyrisXD &amp; mmphego.</p>' + stamp();
+  }
+
+  function shield(label, color, logo) {
+    var l = encodeURIComponent(label).replace(/%20/g, "_");
+    return '<img src="https://img.shields.io/badge/' + l + '-' + color + '?style=for-the-badge&logo=' + encodeURIComponent(logo) + '&logoColor=white" alt="' + esc(label) + '" />';
+  }
+  function renderBadges() {
+    var logos = { "Rust":["rust","000000"],"Python":["python","3776AB"],"C++":["cplusplus","00599C"],
+      "TypeScript":["typescript","3178C6"],"Go":["go","00ADD8"],"JavaScript":["javascript","F7DF1E"],
+      "CUDA":["nvidia","76B900"],"ROS 2":["ros","22314E"],"Tauri":["tauri","24C8DB"],"F#":["fsharp","378BBA"] };
+    var html = "<h1>Isabel Wu</h1>" +
+      '<p class="tagline">Building for robotics, embedded systems, and AI agents at USC.</p>' +
+      "<h3>Languages &amp; tools</h3><p class=\"badges\">";
+    Object.keys(logos).forEach(function (k) { html += shield(k, logos[k][1], logos[k][0]); });
+    html += "</p><h3>Profile</h3><p class=\"badges\">" +
+      '<img src="https://img.shields.io/github/followers/wuisabel-gif?style=for-the-badge&logo=github&label=Followers&color=0c7a8c" alt="Followers" />' +
+      '<img src="https://img.shields.io/badge/USC_RoboSub-48_PRs-0c7a8c?style=for-the-badge&logo=github" alt="USC RoboSub 48 PRs" />' +
+      '<img src="https://img.shields.io/badge/Focus-AUV_%2B_AI_agents-12a5bb?style=for-the-badge" alt="Focus" />' + "</p>";
+    if (state.highlights) html += renderHighlights();
+    return html + '<p class="credits">Badges from <a href="https://shields.io" target="_blank" rel="noopener">shields.io</a> — inspired by harish-sethuraman &amp; br3ndonland.</p>' + stamp();
+  }
+
+  function renderIcons() {
+    var ids = "rust,python,cpp,ts,go,js,cs,dart,tauri,arduino,cmake,linux";
+    var html = "<h1>Hi, I'm Isabel 👋</h1>" +
+      '<p class="tagline">Robotics, embedded systems, and AI-agent tools.</p>' +
+      '<h3>Tech</h3><p class="iconwrap"><a href="https://skillicons.dev" target="_blank" rel="noopener">' +
+      '<img src="https://skillicons.dev/icons?i=' + ids + '&perline=6" alt="Tech icons" /></a></p>';
+    if (state.highlights) html += renderHighlights();
+    return html + '<p class="credits">Icon grid from <a href="https://skillicons.dev" target="_blank" rel="noopener">skillicons.dev</a> — inspired by terrytangyuan &amp; peterthehan.</p>' + stamp();
+  }
+
+  function renderPlayful() {
+    var html = "<h1>heyyy, I'm Isabel 🌊🤖✨</h1>" +
+      '<p class="lead">I make tools that take the annoying part out of a bigger problem — usually something in robotics, embedded, or AI-agent land that I got tired of doing by hand. 🛠️</p>' +
+      "<h3>🎈 a few fun facts</h3><ul class=\"funfacts\">" +
+      "<li>🐋 I built a terminal that <em>remembers</em> what my AI agents learn — <strong>" + link("MemoryWhale", highlights[0].u) + "</strong></li>" +
+      "<li>🌊 48 pull requests deep into USC RoboSub's underwater robot 🐟</li>" +
+      "<li>🎻 one of my projects literally listens to a cello being played — <strong>" + link("Cello Analyzer", "https://wuisabel-gif.github.io/Cello-Analyzer/") + "</strong></li>" +
+      "<li>🎮 also: a neon roguelike, a Plants-vs-Zombies remake, and a mood-based music maker 🎹</li>" +
+      "</ul>" +
+      '<p class="sub">💬 Ask me about ROS 2, Rust, or why AI writing sounds like AI. · 📫 <a href="https://github.com/wuisabel-gif" target="_blank" rel="noopener">@wuisabel-gif</a></p>';
+    return html + stamp();
+  }
+
+  function renderRetro() {
+    var t = '<div class="term"><div class="tbar"><i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i></div>' +
+      '<div class="tbody">' +
+      '<span class="p">visitor@github</span>:<span class="m">~</span>$ <span class="c">whoami</span>\n' +
+      "isabel wu — computer engineering & cs @ usc\n\n" +
+      '<span class="p">visitor@github</span>:<span class="m">~</span>$ <span class="c">cat focus.txt</span>\n' +
+      "> robotics · embedded systems · ai-agent tooling\n\n" +
+      '<span class="p">visitor@github</span>:<span class="m">~</span>$ <span class="c">ls ~/highlights</span>\n' +
+      "MemoryWhale/   Cadence/   Real/\n\n" +
+      '<span class="p">visitor@github</span>:<span class="m">~</span>$ <span class="c">git log --oneline --author=isabel usc-robosub</span>\n' +
+      "48 commits reachable · 25 merged · ros 2 auv stack\n\n" +
+      '<span class="p">visitor@github</span>:<span class="m">~</span>$ <span class="c">./contact.sh</span>\n' +
+      'opening <a href="https://github.com/wuisabel-gif" target="_blank" rel="noopener">github.com/wuisabel-gif</a> ...\n' +
+      '<span class="p">visitor@github</span>:<span class="m">~</span>$ <span style="opacity:.7">▍</span>' +
+      "</div></div>";
+    return t + '<p class="credits">Terminal aesthetic — inspired by fnky &amp; BrunnerLivio.</p>' + stamp();
+  }
+
+  function renderCodeBlock() {
+    var langs = TECH.slice(0, 8).map(function (l) { return '<span class="st">"' + l + '"</span>'; }).join(", ");
+    var code =
+      '<span class="kw">class</span> <span class="fn">IsabelWu</span>(Engineer):\n' +
+      '    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="pr">self</span>):\n' +
+      '        <span class="pr">self</span>.school   = <span class="st">"USC — Computer Engineering & CS"</span>\n' +
+      '        <span class="pr">self</span>.focus    = [<span class="st">"robotics"</span>, <span class="st">"embedded"</span>, <span class="st">"AI agents"</span>]\n' +
+      '        <span class="pr">self</span>.langs    = [' + langs + ']\n' +
+      '        <span class="pr">self</span>.current  = <span class="st">"48 PRs to USC RoboSub — ROS 2 AUV stack"</span>\n\n' +
+      '    <span class="kw">def</span> <span class="fn">philosophy</span>(<span class="pr">self</span>):\n' +
+      '        <span class="cm"># remove the step that used to be manual</span>\n' +
+      '        <span class="kw">return</span> <span class="st">"the next person starts a little farther ahead"</span>';
+    var html = "<h1>Isabel Wu</h1>" + '<pre class="code"><code>' + code + "</code></pre>";
+    if (state.highlights) html += renderHighlights();
+    return html + '<p class="credits">Profile-as-code — inspired by Thaiane &amp; anmol098.</p>' + stamp();
+  }
+
+  function renderGame() {
+    var pieces = { 0: "♜♞♝♛♚♝♞♜", 1: "♟♟♟♟♟♟♟♟", 6: "♙♙♙♙♙♙♙♙", 7: "♖♘♗♕♔♗♘♖" };
+    var board = '<div class="board" role="img" aria-label="chess board">';
+    for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) {
+      var row = pieces[r] || "        ";
+      board += '<div class="' + ((r + c) % 2 ? "dk" : "lt") + '">' + (row[c] === " " ? "" : row[c]) + "</div>";
+    }
+    board += "</div>";
+    var html = "<h1>♟️ Care for a game?</h1>" +
+      '<p class="lead">This board is live on the real profile — you make a move by opening a GitHub issue, and a GitHub Action plays the response and redraws the board. (Static preview here.)</p>' +
+      board +
+      '<p class="sub">▶️ <strong>Your move:</strong> open an issue titled <code>move e2e4</code> · restart with <code>chess new</code></p>';
+    return html + '<p class="credits">Interactive-via-Actions pattern — inspired by timburgan\'s live chess &amp; DoubleGremlin181.</p>' + stamp();
+  }
+
+  function renderAnime() {
+    var banner = "https://capsule-render.vercel.app/api?type=waving&color=0:0c7a8c,100:12a5bb&height=200&section=header"
+      + "&text=Isabel%20Wu&fontSize=54&fontColor=ffffff&desc=robotics%20%C2%B7%20embedded%20%C2%B7%20AI%20agents&descAlignY=68&descSize=18&animation=fadeIn";
+    var html = '<div class="banner"><img src="' + banner + '" alt="Isabel Wu — robotics · embedded · AI agents" /></div>' +
+      '<p class="lead">Computer Engineering &amp; Computer Science junior at USC, building intelligent systems for robotics, electronics, and clearer tools.</p>';
+    if (state.highlights) html += renderHighlights();
+    return html + '<p class="credits">Banner from <a href="https://github.com/kyechan99/capsule-render" target="_blank" rel="noopener">capsule-render</a> — the themed-art / decorative-header pattern (as in anime/art profiles like innng). Drop in a custom image or GIF banner to go fully illustrated.</p>' + stamp();
+  }
+
+  var RENDERERS = {
+    narrative: renderNarrative, table: renderTable, minimal: renderMinimal, dynamic: renderDynamic,
+    typing: renderTyping, badges: renderBadges, icons: renderIcons, playful: renderPlayful,
+    retro: renderRetro, codeblock: renderCodeBlock, game: renderGame, anime: renderAnime
+  };
+  var ALLOWED = {
+    narrative: ["highlights", "org", "openSource", "catalog"],
+    table: ["highlights", "org", "openSource", "catalog"],
+    minimal: ["highlights", "privateWork"],
+    dynamic: ["highlights", "org", "openSource"],
+    typing: ["highlights"], badges: ["highlights"], icons: ["highlights"],
+    playful: [], retro: [], codeblock: ["highlights"], game: [], anime: ["highlights"]
+  };
+
+  function render() {
+    var el = document.getElementById("readme");
+    var html = (RENDERERS[state.style] || renderNarrative)();
+    // restart the fade
+    el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";
+    el.innerHTML = html;
+    // lock section toggles a style ignores
+    var allowed = ALLOWED[state.style] || [];
+    document.querySelectorAll("[data-lockfor]").forEach(function (c) {
+      var ignored = allowed.indexOf(c.dataset.lockfor) === -1;
+      c.classList.toggle("locked", ignored);
+      c.querySelector("input").disabled = ignored;
+    });
+  }
+
+  var CHECK_SVG = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+  function buildChecks(hostId, defs) {
+    var host = document.getElementById(hostId);
+    defs.forEach(function (d) {
+      var lab = document.createElement("label");
+      lab.className = "check"; lab.dataset.lockfor = d.key;
+      lab.innerHTML = '<input type="checkbox" ' + (state[d.key] ? "checked" : "") + '>' +
+        '<span class="box">' + CHECK_SVG + "</span>" +
+        '<span class="lab">' + d.t + "<small>" + d.d + "</small></span>";
+      lab.querySelector("input").addEventListener("change", function (e) {
+        state[d.key] = e.target.checked; render();
+      });
+      host.appendChild(lab);
+    });
+  }
+
+  buildChecks("sections", sectionDefs);
+  buildChecks("privacy", privacyDefs);
+
+  document.getElementById("styles").addEventListener("click", function (e) {
+    var btn = e.target.closest(".segbtn"); if (!btn) return;
+    state.style = btn.dataset.style;
+    document.querySelectorAll("#styles .segbtn").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b === btn));
+    });
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
