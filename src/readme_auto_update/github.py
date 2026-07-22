@@ -6,6 +6,8 @@ import time
 import urllib.error
 import urllib.request
 
+from . import USER_AGENT
+
 
 class GitHubAPIError(RuntimeError):
     pass
@@ -31,7 +33,7 @@ class GitHubClient:
             headers={
                 "Authorization": f"Bearer {self._token}",
                 "Content-Type": "application/json",
-                "User-Agent": "readme-auto-update/0.2",
+                "User-Agent": USER_AGENT,
             },
             method="POST",
         )
