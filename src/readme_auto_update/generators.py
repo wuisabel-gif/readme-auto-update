@@ -123,6 +123,11 @@ def _openai_request(api_key: str, model: str, user_input: str) -> urllib.request
 
 
 def _openai_text(result: dict) -> str:
+    if result.get("status") == "incomplete":
+        reason = (result.get("incomplete_details") or {}).get("reason") or "unknown"
+        raise RuntimeError(
+            f"OpenAI response was incomplete ({reason}); increase max_output_tokens"
+        )
     pieces: list[str] = []
     for output in result.get("output", []):
         if output.get("type") != "message":
@@ -156,8 +161,13 @@ def _anthropic_request(api_key: str, model: str, user_input: str) -> urllib.requ
 
 
 def _anthropic_text(result: dict) -> str:
-    if result.get("stop_reason") == "refusal":
+    stop_reason = result.get("stop_reason")
+    if stop_reason == "refusal":
         raise RuntimeError("Anthropic API declined the request (stop_reason: refusal)")
+    if stop_reason == "max_tokens":
+        raise RuntimeError(
+            "Anthropic response was truncated (stop_reason: max_tokens); increase max_tokens"
+        )
     return "\n".join(
         block["text"]
         for block in result.get("content", [])
@@ -203,10 +213,10 @@ def ai_summary(
         raise RuntimeError(f"{name} API request failed: {exc.reason}") from exc
 
     text = extract_text(result).strip()
-    if text.startswith("```markdown") and text.endswith("```"):
-        text = text[len("```markdown") : -3].strip()
-    elif text.startswith("```") and text.endswith("```"):
-        text = text[3:-3].strip()
+    # Strip a wrapping code fence regardless of the info string (```markdown, ```md, bare ```).
+    if text.startswith("```") and text.endswith("```"):
+        newline = text.find("\n")
+        text = (text[newline + 1 : -3] if newline != -1 else text[3:-3]).strip()
     if not text:
         raise RuntimeError(f"{name} API returned no text output")
     return text
