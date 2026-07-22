@@ -261,13 +261,12 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The [`Release Docker action`](.github/workflows/release.yml) workflow validates the tag, builds the
-Docker Action image once, and publishes it to GHCR as both
-`ghcr.io/wuisabel-gif/readme-auto-update:v1.0.0` and
-`ghcr.io/wuisabel-gif/readme-auto-update:v1` (for a `v1.x.y` release). It then force-updates the
-Git `v1` tag to the released commit. The workflow uses the repository `GITHUB_TOKEN`; its
-permissions are limited to package publishing and the contents access needed for the tag update.
-The `v1` update is guarded and does not recursively run another release.
+The [`Release`](.github/workflows/release.yml) workflow validates the tag and force-updates the Git
+`v1` tag to the released commit (for a `v1.x.y` release), so `@v1` always tracks the latest release.
+The action runs from the `Dockerfile` at the resolved tag — GitHub builds the image on the runner —
+so there is no separately published image to keep in sync. The workflow uses the repository
+`GITHUB_TOKEN` with only the contents access needed for the tag update, and the `v1` update is
+guarded so it does not recursively run another release.
 
 To consume the action, use the public repository coordinate:
 
