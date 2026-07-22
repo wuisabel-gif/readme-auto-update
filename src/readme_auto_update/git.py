@@ -45,5 +45,11 @@ def commit_and_push(root: Path, path: str, message: str) -> None:
         branch = run_git(root, "branch", "--show-current").strip()
     if not branch:
         raise GitError("Cannot determine the branch to push; set GITHUB_REF_NAME")
-    run_git(root, "push", "origin", f"HEAD:{branch}")
+    try:
+        run_git(root, "push", "origin", f"HEAD:{branch}")
+    except GitError:
+        # Another commit landed on the branch between checkout and push (a non-fast-forward).
+        # Rebase our single commit on top and retry once rather than discarding a good run.
+        run_git(root, "pull", "--rebase", "origin", branch)
+        run_git(root, "push", "origin", f"HEAD:{branch}")
 
