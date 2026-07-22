@@ -5,6 +5,7 @@ import json
 import urllib.error
 import urllib.request
 
+from . import USER_AGENT
 from .snapshot import AccountSnapshot, RepositorySummary
 
 
@@ -116,7 +117,7 @@ def _openai_request(api_key: str, model: str, user_input: str) -> urllib.request
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            "User-Agent": "readme-auto-update/0.2",
+            "User-Agent": USER_AGENT,
         },
         method="POST",
     )
@@ -154,7 +155,7 @@ def _anthropic_request(api_key: str, model: str, user_input: str) -> urllib.requ
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "Content-Type": "application/json",
-            "User-Agent": "readme-auto-update/0.2",
+            "User-Agent": USER_AGENT,
         },
         method="POST",
     )
