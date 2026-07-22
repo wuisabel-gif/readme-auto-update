@@ -11,6 +11,12 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "github_token is required"):
                 Config.from_env()
 
+    def test_action_does_not_fall_back_to_gh_token_env(self):
+        # A workflow-exported GH_TOKEN must not silently become the discovery credential.
+        with patch.dict(os.environ, {"GH_TOKEN": "workflow-scoped"}, clear=True):
+            with self.assertRaisesRegex(ValueError, "github_token is required"):
+                Config.from_env()
+
     def test_auto_uses_rules_without_openai_key(self):
         with patch.dict(os.environ, {"INPUT_GITHUB_TOKEN": "gh-test"}, clear=True):
             config = Config.from_env()

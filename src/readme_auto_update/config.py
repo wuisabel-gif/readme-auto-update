@@ -57,7 +57,11 @@ class Config:
         if mode not in {"auto", "ai", "rules"}:
             raise ValueError("mode must be one of: auto, ai, rules")
 
-        github_token = _input("github_token") or os.getenv("GH_TOKEN", "")
+        # The Action requires an explicit, user-authorized input. It intentionally does not
+        # fall back to GH_TOKEN: workflows often export GH_TOKEN=${{ secrets.GITHUB_TOKEN }}
+        # for gh-cli steps, and silently discovering with that token is confusing at best and
+        # a credential surprise at worst. (The local skill script keeps its own env fallback.)
+        github_token = _input("github_token")
         if not github_token:
             raise ValueError(
                 "github_token is required for account-wide repository and contribution discovery"
