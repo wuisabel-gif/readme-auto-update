@@ -153,6 +153,59 @@ class GeneratorTests(unittest.TestCase):
                 extra_prompt="",
             )
 
+    @patch("readme_auto_update.generators.urllib.request.urlopen")
+    def test_anthropic_writer_raises_on_truncation(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            {"stop_reason": "max_tokens", "content": [{"type": "text", "text": "Half a sec"}]}
+        )
+        with self.assertRaisesRegex(RuntimeError, "truncated|max_tokens"):
+            ai_summary(
+                sample_snapshot(),
+                provider="anthropic",
+                api_key="k",
+                model="",
+                prior_content="",
+                extra_prompt="",
+            )
+
+    @patch("readme_auto_update.generators.urllib.request.urlopen")
+    def test_openai_writer_raises_on_incomplete(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            {
+                "status": "incomplete",
+                "incomplete_details": {"reason": "max_output_tokens"},
+                "output": [
+                    {"type": "message", "content": [{"type": "output_text", "text": "Cut of"}]}
+                ],
+            }
+        )
+        with self.assertRaisesRegex(RuntimeError, "incomplete|max_output_tokens"):
+            ai_summary(
+                sample_snapshot(),
+                api_key="k",
+                model="",
+                prior_content="",
+                extra_prompt="",
+            )
+
+    @patch("readme_auto_update.generators.urllib.request.urlopen")
+    def test_strips_md_info_string_fence(self, urlopen):
+        urlopen.return_value = FakeResponse(
+            {
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": "```md\n## Projects\nUseful.\n```"}],
+            }
+        )
+        output = ai_summary(
+            sample_snapshot(),
+            provider="anthropic",
+            api_key="k",
+            model="",
+            prior_content="",
+            extra_prompt="",
+        )
+        self.assertEqual(output, "## Projects\nUseful.")
+
 
 if __name__ == "__main__":
     unittest.main()
