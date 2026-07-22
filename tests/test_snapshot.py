@@ -329,13 +329,33 @@ class SnapshotTests(unittest.TestCase):
         )
         with patch("readme_auto_update.github.urllib.request.urlopen", side_effect=http_error):
             with self.assertRaisesRegex(Exception, "HTTP 500") as raised:
-                GitHubClient("token").graphql("query", {})
+                GitHubClient("token", max_retries=0).graphql("query", {})
         self.assertNotIn("private-repository-sentinel", str(raised.exception))
         with patch("readme_auto_update.github.urllib.request.urlopen",
                    return_value=FakeResponse({"errors": [{"message": "private-repository-sentinel"}]})):
             with self.assertRaises(Exception) as raised:
-                GitHubClient("token").graphql("query", {})
+                GitHubClient("token", max_retries=0).graphql("query", {})
         self.assertNotIn("private-repository-sentinel", str(raised.exception))
+
+    @patch("readme_auto_update.github.time.sleep", return_value=None)
+    @patch("readme_auto_update.github.urllib.request.urlopen")
+    def test_retries_transient_5xx_then_succeeds(self, urlopen, sleep):
+        transient = urllib.error.HTTPError("https://api.github.com/graphql", 502, "bad", {}, None)
+        urlopen.side_effect = [transient, FakeResponse({"data": {"viewer": {"login": "ok"}}})]
+        data = GitHubClient("token", max_retries=2).graphql("query", {})
+        self.assertEqual(data["viewer"]["login"], "ok")
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once()
+
+    @patch("readme_auto_update.github.time.sleep", return_value=None)
+    @patch("readme_auto_update.github.urllib.request.urlopen")
+    def test_does_not_retry_auth_errors(self, urlopen, sleep):
+        forbidden = urllib.error.HTTPError("https://api.github.com/graphql", 403, "no", {}, None)
+        urlopen.side_effect = forbidden
+        with self.assertRaisesRegex(Exception, "HTTP 403"):
+            GitHubClient("token", max_retries=2).graphql("query", {})
+        self.assertEqual(urlopen.call_count, 1)
+        sleep.assert_not_called()
 
     @patch("readme_auto_update.github.urllib.request.urlopen")
     def test_github_client_posts_graphql_with_bearer_token(self, urlopen):
