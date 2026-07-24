@@ -17,6 +17,16 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "github_token is required"):
                 Config.from_env()
 
+    def test_default_template_is_icons(self):
+        with patch.dict(os.environ, {"INPUT_GITHUB_TOKEN": "t"}, clear=True):
+            self.assertEqual(Config.from_env().template, "icons")
+
+    def test_rejects_unknown_template(self):
+        env = {"INPUT_GITHUB_TOKEN": "t", "INPUT_TEMPLATE": "hologram"}
+        with patch.dict(os.environ, env, clear=True):
+            with self.assertRaisesRegex(ValueError, "template must be one of"):
+                Config.from_env()
+
     def test_auto_uses_rules_without_openai_key(self):
         with patch.dict(os.environ, {"INPUT_GITHUB_TOKEN": "gh-test"}, clear=True):
             config = Config.from_env()

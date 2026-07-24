@@ -1,8 +1,9 @@
 import json
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
 
-from readme_auto_update.generators import ai_summary, rules_summary
+from readme_auto_update.generators import TEMPLATES, _skill_icons, ai_summary, rules_summary
 from readme_auto_update.snapshot import AccountSnapshot, Profile, RepositorySummary
 
 
@@ -82,10 +83,53 @@ class FakeResponse:
 class GeneratorTests(unittest.TestCase):
     def test_rules_writer_separates_projects_and_private_work(self):
         output = rules_summary(sample_snapshot())
-        self.assertIn("## Projects", output)
+        self.assertIn("Projects", output)
         self.assertIn("sample-project", output)
-        self.assertIn("## Private work", output)
+        self.assertIn("Private work", output)
         self.assertNotIn("example-org/private-project", output)
+
+    def test_rules_writer_emits_a_skill_icon_tech_row(self):
+        output = rules_summary(sample_snapshot())
+        self.assertIn("🛠️ Tech", output)
+        self.assertIn("skillicons.dev/icons?i=rust", output)
+
+    def test_every_template_renders_with_its_marker_and_stamp(self):
+        snap = sample_snapshot()
+        markers = {
+            "icons": "skillicons.dev",
+            "badges": "img.shields.io",
+            "table": "| Project |",
+            "minimalist": "?tab=repositories",
+            "playful": "fun facts",
+            "code-block": "```python",
+            "banner": "capsule-render",
+            "stats": "github-readme-stats",
+        }
+        self.assertEqual(set(markers), set(TEMPLATES))
+        for name in TEMPLATES:
+            out = rules_summary(snap, template=name)
+            self.assertIn("README Auto Update on", out, f"{name} missing stamp")
+            self.assertIn(markers[name], out, f"{name} missing marker")
+
+    def test_unknown_template_falls_back_to_icons(self):
+        snap = sample_snapshot()
+        self.assertEqual(
+            rules_summary(snap, template="hologram"),
+            rules_summary(snap, template="icons"),
+        )
+
+    def test_skill_icons_orders_by_use_skips_unmapped_and_private(self):
+        snap = sample_snapshot()
+        template = snap.repositories[0]
+        repos = (
+            replace(template, name_with_owner="u/a", language="Python", relationship="owned"),
+            replace(template, name_with_owner="u/b", language="Python", relationship="owned"),
+            replace(template, name_with_owner="u/c", language="Go", relationship="owned"),
+            replace(template, name_with_owner="u/d", language="Julia", relationship="owned"),
+            replace(template, name_with_owner="Private work", language="", relationship="private"),
+        )
+        row = _skill_icons(replace(snap, repositories=repos))
+        self.assertEqual(row, "![Tech](https://skillicons.dev/icons?i=python,go)")
 
     @patch("readme_auto_update.generators.urllib.request.urlopen")
     def test_ai_writer_receives_structured_evidence(self, urlopen):

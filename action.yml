@@ -28,6 +28,13 @@ inputs:
     description: Name used in the managed-section HTML comments.
     required: false
     default: readme-auto-update
+  template:
+    description: >-
+      Free structural layout for the README: icons, badges, table, minimalist,
+      playful, code-block, banner, or stats. `stats` is opt-in — it sends your
+      username to third-party stat services; the others do not.
+    required: false
+    default: icons
   model:
     description: >-
       Model used in AI mode. Defaults to gpt-5.6-luna for OpenAI and
