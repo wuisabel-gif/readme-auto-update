@@ -274,21 +274,46 @@ To consume the action, use the public repository coordinate:
 - uses: wuisabel-gif/readme-auto-update@v1
 ```
 
-### Action writer modes
+### Free structural templates (no agent, no key)
 
-- `auto` (default) uses AI when an API key is present and deterministic rules otherwise.
-- `ai` writes from privacy-filtered evidence through the OpenAI Responses API or the Anthropic
-  Messages API. When both keys are set, OpenAI is used.
-- `rules` makes no model request and has no model cost.
+The default writer is `rules`: it renders your real GitHub evidence into a polished,
+markdown-native layout with **no model request and no cost**. Pick a look with the
+`template` input:
 
-Example rules-only configuration:
+| `template` | Look |
+| --- | --- |
+| `icons` (default) | Skill-icon tech row + project catalog |
+| `badges` | Shields.io tech badges |
+| `table` | Everything in tidy tables |
+| `minimalist` | Terse, text-only |
+| `playful` | Emoji section headers |
+| `code-block` | Fenced "manifest" block |
+| `banner` | Capsule-render header + highlights |
+| `stats` | github-readme-stats cards (opt-in: sends your username to third-party stat services) |
 
 ```yaml
       - uses: wuisabel-gif/readme-auto-update@v1
         with:
           github_token: ${{ secrets.README_AUTO_UPDATE_GITHUB_TOKEN }}
-          mode: rules
+          template: badges   # mode defaults to auto → rules when no key is set
 ```
+
+Want a **narrative "builder's story"** instead of a structural layout? Run the skill in
+your own agent (Claude Code, Codex, Cursor, Gemini), or polish the prose with
+[Cadence](https://github.com/wuisabel-gif/Cadence). No API key required for either.
+
+### Advanced: unattended AI narrative
+
+For a scheduled Action that writes prose with no agent in the loop, add an API key and the
+writer switches to `ai` automatically:
+
+- `auto` (default) uses AI when an API key is present and the free template otherwise.
+- `ai` writes from privacy-filtered evidence through the OpenAI Responses API or the Anthropic
+  Messages API. When both keys are set, OpenAI is used.
+- `rules` always renders the free template.
+
+If the AI writer errors, the run **falls back to your chosen `template`** and stays green
+(a `::warning::` explains what happened). Set `strict: true` to fail the run instead.
 
 ## Action inputs
 
@@ -298,6 +323,8 @@ Example rules-only configuration:
 | `openai_api_key` | — | AI mode requires this or `anthropic_api_key` |
 | `anthropic_api_key` | — | Used in AI mode when no OpenAI key is set |
 | `mode` | `auto` | `auto`, `ai`, or `rules` |
+| `template` | `icons` | Free structural layout: `icons`, `badges`, `table`, `minimalist`, `playful`, `code-block`, `banner`, `stats` |
+| `strict` | `false` | Fail the run if the AI writer errors, instead of falling back to `template` |
 | `output_file` | `README.md` | Markdown file to update |
 | `section_name` | `readme-auto-update` | Name embedded in marker comments |
 | `model` | per provider | AI writer model; defaults to `gpt-5.6-luna` (OpenAI) or `claude-opus-4-8` (Anthropic) |
