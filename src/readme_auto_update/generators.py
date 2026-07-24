@@ -112,8 +112,16 @@ _GROUP_HEADINGS = (
     ("owned", "## 🚀 Projects"),
     ("organization", "## 🏛️ Organization work"),
     ("open_source", "## 🤝 Open-source contributions"),
-    ("private", "## 🔒 Private work"),
 )
+
+
+def _private_note(snapshot: AccountSnapshot) -> str:
+    # Private work is summarized in one line, never its own section: the whole point
+    # is that the detail stays private, so it shouldn't be the loudest heading on the page.
+    n = snapshot.private_contributions
+    if not n:
+        return ""
+    return f"_Plus **{n} {_plural(n, 'contribution')}** in private repositories, kept private._"
 
 
 def _grouped(snapshot: AccountSnapshot) -> dict[str, list[RepositorySummary]]:
@@ -131,6 +139,9 @@ def _catalog(snapshot: AccountSnapshot) -> str:
         if repositories:
             body = "\n".join(_repository_line(r) for r in repositories)
             blocks.append(f"{heading}\n\n{body}")
+    note = _private_note(snapshot)
+    if note:
+        blocks.append(note)
     return "\n\n".join(blocks)
 
 
@@ -141,9 +152,6 @@ def _catalog_tables(snapshot: AccountSnapshot) -> str:
         repositories = groups.get(relationship) or []
         if not repositories:
             continue
-        if relationship == "private":
-            blocks.append(f"{heading}\n\n{_repository_line(repositories[0])}")
-            continue
         rows = ["| Project | What it does | Lang |", "| --- | --- | --- |"]
         for r in repositories:
             label = r.name_with_owner.split("/")[-1]
@@ -152,6 +160,9 @@ def _catalog_tables(snapshot: AccountSnapshot) -> str:
             desc = (r.description or "—").replace("|", "\\|").replace("\n", " ")
             rows.append(f"| {name} | {desc} | {r.language or '—'} |")
         blocks.append(f"{heading}\n\n" + "\n".join(rows))
+    note = _private_note(snapshot)
+    if note:
+        blocks.append(note)
     return "\n\n".join(blocks)
 
 
@@ -219,9 +230,7 @@ def _tpl_minimalist(snapshot: AccountSnapshot, now: str) -> str:
         for r in featured
     )
     more = f"More across my [repositories](https://github.com/{snapshot.profile.login}?tab=repositories)."
-    groups = _grouped(snapshot)
-    private = "## 🔒 Private work\n\n" + _repository_line(groups["private"][0]) if groups.get("private") else ""
-    return _join([_intro(snapshot), highlights, more, private, _stamp(now)])
+    return _join([_intro(snapshot), highlights, more, _private_note(snapshot), _stamp(now)])
 
 
 def _tpl_playful(snapshot: AccountSnapshot, now: str) -> str:
