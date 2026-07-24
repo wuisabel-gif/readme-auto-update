@@ -81,11 +81,13 @@ class FakeResponse:
 
 
 class GeneratorTests(unittest.TestCase):
-    def test_rules_writer_separates_projects_and_private_work(self):
+    def test_rules_writer_summarizes_private_work_without_a_section(self):
         output = rules_summary(sample_snapshot())
         self.assertIn("Projects", output)
         self.assertIn("sample-project", output)
-        self.assertIn("Private work", output)
+        # Private work is a one-line summary, never its own heading, and never named.
+        self.assertNotIn("🔒 Private work", output)
+        self.assertIn("in private repositories, kept private", output)
         self.assertNotIn("example-org/private-project", output)
 
     def test_rules_writer_emits_a_skill_icon_tech_row(self):
