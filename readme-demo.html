@@ -171,6 +171,15 @@
     border-color: var(--accent); background: var(--accent-wash);
   }
   .segbtn[aria-pressed="true"] .t { color: var(--accent-ink); }
+  .segbtn .tag {
+    margin-top: 4px; align-self: flex-start; font-size: 10px; font-weight: 600;
+    letter-spacing: .02em; padding: 1px 6px; border-radius: 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .segbtn .tag.tmpl { background: var(--accent-wash); color: var(--accent-ink); }
+  .segbtn .tag.web { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--muted); }
+  .hint { font-size: 11px; line-height: 1.5; color: var(--muted); margin: 2px 0 8px; }
+  .hint code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--accent-ink); }
 
   .checks { display: flex; flex-direction: column; gap: 2px; }
   .check {
@@ -322,42 +331,45 @@
   <div class="layout">
     <aside class="rail">
       <div class="grouplabel"><span class="n">01</span> Display style</div>
+      <p class="hint"><code>template:</code> renders free on GitHub via the Action — no key.
+      <em>web preview only</em> = CSS/interactive looks that GitHub strips; use these in your own
+      agent or <a href="https://github.com/wuisabel-gif/Cadence">Cadence</a>.</p>
       <div class="seg" id="styles">
         <button class="segbtn" data-style="narrative" aria-pressed="true">
-          <span class="t">Narrative + catalog</span><span class="d">The builder's story, grouped by theme</span>
+          <span class="t">Narrative + catalog</span><span class="d">The builder's story, grouped by theme</span><span class="tag web">agent / Cadence</span>
         </button>
         <button class="segbtn" data-style="table" aria-pressed="false">
-          <span class="t">Compact table</span><span class="d">Dense, scannable index of projects</span>
+          <span class="t">Compact table</span><span class="d">Dense, scannable index of projects</span><span class="tag tmpl">template: table</span>
         </button>
         <button class="segbtn" data-style="minimal" aria-pressed="false">
-          <span class="t">Minimalist</span><span class="d">Clean type, three highlights, a door</span>
+          <span class="t">Minimalist</span><span class="d">Clean type, three highlights, a door</span><span class="tag tmpl">template: minimalist</span>
         </button>
         <button class="segbtn" data-style="dynamic" aria-pressed="false">
-          <span class="t">Dynamic / live stats</span><span class="d">Typing header, stat cards, activity graph</span>
+          <span class="t">Dynamic / live stats</span><span class="d">Typing header, stat cards, activity graph</span><span class="tag tmpl">template: stats</span>
         </button>
         <button class="segbtn" data-style="typing" aria-pressed="false">
-          <span class="t">Typing animation</span><span class="d">Animated SVG header · CyrisXD</span>
+          <span class="t">Typing animation</span><span class="d">Animated SVG header · CyrisXD</span><span class="tag web">agent / Cadence</span>
         </button>
         <button class="segbtn" data-style="badges" aria-pressed="false">
-          <span class="t">Badges</span><span class="d">shields.io tech-stack wall · br3ndonland</span>
+          <span class="t">Badges</span><span class="d">shields.io tech-stack wall · br3ndonland</span><span class="tag tmpl">template: badges</span>
         </button>
         <button class="segbtn" data-style="icons" aria-pressed="false">
-          <span class="t">Icons</span><span class="d">skillicons.dev grid · terrytangyuan</span>
+          <span class="t">Icons</span><span class="d">skillicons.dev grid · terrytangyuan</span><span class="tag tmpl">template: icons</span>
         </button>
         <button class="segbtn" data-style="playful" aria-pressed="false">
-          <span class="t">Playful</span><span class="d">Emoji-forward, fun facts · saadeghi</span>
+          <span class="t">Playful</span><span class="d">Emoji-forward, fun facts · saadeghi</span><span class="tag tmpl">template: playful</span>
         </button>
         <button class="segbtn" data-style="retro" aria-pressed="false">
-          <span class="t">Retro / terminal</span><span class="d">CRT terminal aesthetic · fnky</span>
+          <span class="t">Retro / terminal</span><span class="d">CRT terminal aesthetic · fnky</span><span class="tag web">web preview only</span>
         </button>
         <button class="segbtn" data-style="codeblock" aria-pressed="false">
-          <span class="t">Code-block</span><span class="d">Profile as a class definition · Thaiane</span>
+          <span class="t">Code-block</span><span class="d">Profile as a class definition · Thaiane</span><span class="tag tmpl">template: code-block</span>
         </button>
         <button class="segbtn" data-style="game" aria-pressed="false">
-          <span class="t">Game mode</span><span class="d">Play-me board via Actions · timburgan</span>
+          <span class="t">Game mode</span><span class="d">Play-me board via Actions · timburgan</span><span class="tag web">web preview only</span>
         </button>
         <button class="segbtn" data-style="anime" aria-pressed="false">
-          <span class="t">Themed banner</span><span class="d">capsule-render art header · innng</span>
+          <span class="t">Themed banner</span><span class="d">capsule-render art header · innng</span><span class="tag tmpl">template: banner</span>
         </button>
       </div>
 
