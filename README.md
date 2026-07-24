@@ -353,12 +353,21 @@ python3 -m compileall -q entrypoint.py src tests skills/readme-auto-update/scrip
 docker build -t readme-auto-update .
 ```
 
-## Related projects
+## Pair with Cadence
 
-- **[Cadence](https://github.com/wuisabel-gif/Cadence)** — an AI-text humanizer that scores prose
-  for machine-generated patterns and rewrites it in a chosen voice. Pair it with README Auto
-  Update: after generating a README section, run Cadence over the prose to catch flat sentence
-  rhythm and AI-sounding phrasing before publishing.
+README Auto Update assembles the **structure** for free — badges, icons, grouped work, all with no
+agent and no API key. **[Cadence](https://github.com/wuisabel-gif/Cadence)** turns the **prose**
+into a story: after generating a section, run Cadence to humanize the intro and project blurbs into
+a voice that sounds like you. It scores prose for machine-generated patterns and rewrites it in a
+chosen voice — no extra key, since it runs in the agent you already have.
+
+Both skills are co-listed in one marketplace, so you can install the pair in one place:
+
+```text
+/plugin marketplace add wuisabel-gif/Cadence
+/plugin install readme-auto-update@cadence
+/plugin install cadence@cadence
+```
 
 ## License
 
