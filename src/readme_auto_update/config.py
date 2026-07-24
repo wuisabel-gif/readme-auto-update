@@ -51,6 +51,7 @@ class Config:
     dry_run: bool
     anthropic_api_key: str = ""
     template: str = "icons"
+    strict: bool = False
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -125,6 +126,7 @@ class Config:
             ),
             dry_run=_bool(_input("dry_run", "false"), name="dry_run"),
             template=template,
+            strict=_bool(_input("strict", "false"), name="strict"),
         )
 
     @property

@@ -95,6 +95,12 @@ inputs:
     description: Generate and print a diff without writing or pushing.
     required: false
     default: "false"
+  strict:
+    description: >-
+      Fail the run if the AI writer errors, instead of falling back to the free
+      structural template. Default false keeps runs green and the README fresh.
+    required: false
+    default: "false"
 
 outputs:
   changed:

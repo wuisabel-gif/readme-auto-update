@@ -16,8 +16,51 @@ def notice(message: str) -> None:
     print(f"::notice::{message}")
 
 
+def warning(message: str) -> None:
+    print(f"::warning::{message}")
+
+
 def error(message: str) -> None:
     print(f"::error::{message}", file=sys.stderr)
+
+
+def _generate(config: Config, snapshot, old_document: str) -> tuple[str, str]:
+    """Return (generated_markdown, mode_used). The free structural template is the
+    safety net: if the AI writer fails and strict is off, fall back to it and keep
+    the run green; if no key is set at all, note how to get the narrative upgrade."""
+    mode = config.effective_mode
+    if mode == "ai":
+        api_key = config.openai_api_key or config.anthropic_api_key
+        if not api_key:
+            raise ValueError("openai_api_key or anthropic_api_key is required when mode is ai")
+        try:
+            generated = ai_summary(
+                snapshot,
+                provider=config.ai_provider,
+                api_key=api_key,
+                model=config.model,
+                prior_content=managed_content(old_document, config.section_name),
+                extra_prompt=config.prompt,
+            )
+            return generated, "ai"
+        except Exception as exc:
+            if config.strict:
+                raise
+            warning(
+                f"Narrative writer failed ({exc}); wrote the free structural template "
+                f"'{config.template}' instead. Set strict: true to fail the run instead."
+            )
+            return rules_summary(snapshot, template=config.template), "rules"
+
+    generated = rules_summary(snapshot, template=config.template)
+    if config.mode == "auto":
+        notice(
+            f"Wrote the free structural README (rules mode, template: {config.template}). "
+            "For a narrative 'builder's story', run it in your agent, polish with Cadence "
+            "(https://github.com/wuisabel-gif/Cadence), or add an OpenAI/Anthropic key for "
+            "the scheduled Action."
+        )
+    return generated, "rules"
 
 
 def set_output(name: str, value: str) -> None:
@@ -32,22 +75,7 @@ def run(config: Config, root: Path | None = None) -> bool:
     target = root / config.output_file
     old_document = read_document(target)
     snapshot = build_account_snapshot(config)
-    mode = config.effective_mode
-
-    if mode == "ai":
-        api_key = config.openai_api_key or config.anthropic_api_key
-        if not api_key:
-            raise ValueError("openai_api_key or anthropic_api_key is required when mode is ai")
-        generated = ai_summary(
-            snapshot,
-            provider=config.ai_provider,
-            api_key=api_key,
-            model=config.model,
-            prior_content=managed_content(old_document, config.section_name),
-            extra_prompt=config.prompt,
-        )
-    else:
-        generated = rules_summary(snapshot, template=config.template)
+    generated, mode = _generate(config, snapshot, old_document)
 
     if not old_document.strip():
         title = snapshot.profile.name or snapshot.profile.login
