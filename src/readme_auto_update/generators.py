@@ -3,14 +3,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from . import USER_AGENT
 from .snapshot import AccountSnapshot, RepositorySummary
 
 
-# GitHub language name -> skillicons.dev id. Languages absent here are simply
-# omitted from the icon row (skillicons has no icon for them).
+# GitHub language name -> skillicons.dev id / (shields logo slug, hex color).
+# Languages absent from a map are simply omitted from that visual.
 _SKILLICON_IDS = {
     "Rust": "rust", "Python": "python", "C++": "cpp", "C": "c",
     "JavaScript": "js", "TypeScript": "ts", "Go": "go", "C#": "cs",
@@ -18,6 +19,24 @@ _SKILLICON_IDS = {
     "Shell": "bash", "HTML": "html", "CSS": "css", "Swift": "swift",
     "Java": "java", "PHP": "php", "Vue": "vue",
 }
+_BADGE_META = {
+    "Rust": ("rust", "000000"), "Python": ("python", "3776AB"), "C++": ("cplusplus", "00599C"),
+    "C": ("c", "A8B9CC"), "JavaScript": ("javascript", "F7DF1E"), "TypeScript": ("typescript", "3178C6"),
+    "Go": ("go", "00ADD8"), "C#": ("csharp", "512BD4"), "F#": ("dotnet", "512BD4"),
+    "Dart": ("dart", "0175C2"), "Kotlin": ("kotlin", "7F52FF"), "Lua": ("lua", "2C2D72"),
+    "Ruby": ("ruby", "CC342D"), "Shell": ("gnubash", "4EAA25"), "HTML": ("html5", "E34F26"),
+    "CSS": ("css3", "1572B6"), "Julia": ("julia", "9558B2"), "Zig": ("zig", "F7A41D"),
+    "Nim": ("nim", "FFE953"), "Swift": ("swift", "F05138"), "Java": ("openjdk", "007396"),
+}
+
+# Free, deterministic templates the rules writer can render as real GitHub
+# Markdown. `stats` is opt-in because it sends the username to third-party
+# services; the others send nothing about the account beyond the tech list.
+TEMPLATES = ("icons", "badges", "table", "minimalist", "playful", "code-block", "banner", "stats")
+
+
+def _plural(count: int, singular: str) -> str:
+    return singular if count == 1 else singular + "s"
 
 
 def _prominent_languages(snapshot: AccountSnapshot) -> list[str]:
@@ -32,8 +51,7 @@ def _prominent_languages(snapshot: AccountSnapshot) -> list[str]:
 
 
 def _skill_icons(snapshot: AccountSnapshot) -> str:
-    """A single skillicons.dev image row for the account's languages. Sends the
-    tech list only — never the username — so it leaks nothing about the account."""
+    """A skillicons.dev image row. Sends the tech list only — never the username."""
     ids: list[str] = []
     for language in _prominent_languages(snapshot):
         icon = _SKILLICON_IDS.get(language)
@@ -41,10 +59,26 @@ def _skill_icons(snapshot: AccountSnapshot) -> str:
             ids.append(icon)
     if not ids:
         return ""
-    return f"![Tech]({_SKILLICONS_BASE}?i={','.join(ids[:15])})"
+    return f"![Tech](https://skillicons.dev/icons?i={','.join(ids[:15])})"
 
 
-_SKILLICONS_BASE = "https://skillicons.dev/icons"
+def _tech_badges(snapshot: AccountSnapshot) -> str:
+    """A shields.io badge row for the account's languages (tech list only)."""
+    out: list[str] = []
+    for language in _prominent_languages(snapshot)[:12]:
+        slug, color = _BADGE_META.get(language, ("", "0C7A8C"))
+        label = urllib.parse.quote(language.replace("-", "--").replace(" ", "_"))
+        logo = f"&logo={slug}&logoColor=white" if slug else ""
+        out.append(f"![{language}](https://img.shields.io/badge/{label}-{color}?style=flat-square{logo})")
+    return " ".join(out)
+
+
+def _featured(snapshot: AccountSnapshot, count: int) -> list[RepositorySummary]:
+    candidates = [
+        r for r in snapshot.repositories if r.relationship in ("owned", "open_source")
+    ]
+    candidates.sort(key=lambda r: (r.stars, r.contributions, r.updated_at), reverse=True)
+    return candidates[:count]
 
 
 def _repository_line(repository: RepositorySummary) -> str:
@@ -74,50 +108,202 @@ def _repository_line(repository: RepositorySummary) -> str:
     return f"- {name}{language} · {details}{fork}{description}"
 
 
-def rules_summary(snapshot: AccountSnapshot) -> str:
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    profile = snapshot.profile
-    introduction = profile.bio or f"GitHub work and projects by @{profile.login}."
-    repositories_by_relationship: dict[str, list[RepositorySummary]] = {
-        "owned": [],
-        "organization": [],
-        "open_source": [],
-        "private": [],
-    }
-    for repository in snapshot.repositories:
-        repositories_by_relationship.setdefault(repository.relationship, []).append(repository)
+_GROUP_HEADINGS = (
+    ("owned", "## 🚀 Projects"),
+    ("organization", "## 🏛️ Organization work"),
+    ("open_source", "## 🤝 Open-source contributions"),
+    ("private", "## 🔒 Private work"),
+)
 
-    sections: list[str] = [f"{introduction}\n"]
-    icons = _skill_icons(snapshot)
-    if icons:
-        sections.append("## 🛠️ Tech\n")
-        sections.append(icons + "\n")
-    sections += [
-        "## 📊 Recent GitHub activity\n",
+
+def _grouped(snapshot: AccountSnapshot) -> dict[str, list[RepositorySummary]]:
+    groups: dict[str, list[RepositorySummary]] = {}
+    for repository in snapshot.repositories:
+        groups.setdefault(repository.relationship, []).append(repository)
+    return groups
+
+
+def _catalog(snapshot: AccountSnapshot) -> str:
+    groups = _grouped(snapshot)
+    blocks: list[str] = []
+    for relationship, heading in _GROUP_HEADINGS:
+        repositories = groups.get(relationship) or []
+        if repositories:
+            body = "\n".join(_repository_line(r) for r in repositories)
+            blocks.append(f"{heading}\n\n{body}")
+    return "\n\n".join(blocks)
+
+
+def _catalog_tables(snapshot: AccountSnapshot) -> str:
+    groups = _grouped(snapshot)
+    blocks: list[str] = []
+    for relationship, heading in _GROUP_HEADINGS:
+        repositories = groups.get(relationship) or []
+        if not repositories:
+            continue
+        if relationship == "private":
+            blocks.append(f"{heading}\n\n{_repository_line(repositories[0])}")
+            continue
+        rows = ["| Project | What it does | Lang |", "| --- | --- | --- |"]
+        for r in repositories:
+            label = r.name_with_owner.split("/")[-1]
+            target = r.parent_url or r.url
+            name = f"[{label}]({target})" if target else f"**{label}**"
+            desc = (r.description or "—").replace("|", "\\|").replace("\n", " ")
+            rows.append(f"| {name} | {desc} | {r.language or '—'} |")
+        blocks.append(f"{heading}\n\n" + "\n".join(rows))
+    return "\n\n".join(blocks)
+
+
+def _stats_line(snapshot: AccountSnapshot) -> str:
+    return (
         f"Across the selected period: **{snapshot.total_commits} {_plural(snapshot.total_commits, 'commit')}**, "
         f"**{snapshot.total_pull_requests} {_plural(snapshot.total_pull_requests, 'pull request')}**, "
         f"**{snapshot.total_reviews} {_plural(snapshot.total_reviews, 'review')}**, and "
-        f"**{snapshot.total_issues} {_plural(snapshot.total_issues, 'issue')}**.\n",
-    ]
-    headings = (
-        ("owned", "## 🚀 Projects"),
-        ("organization", "## 🏛️ Organization work"),
-        ("open_source", "## 🤝 Open-source contributions"),
-        ("private", "## 🔒 Private work"),
+        f"**{snapshot.total_issues} {_plural(snapshot.total_issues, 'issue')}**."
     )
-    for relationship, heading in headings:
-        repositories = repositories_by_relationship.get(relationship) or []
-        if repositories:
-            sections.append(heading + "\n")
-            sections.extend(_repository_line(repository) for repository in repositories)
-            sections.append("")
-
-    sections.append(f"<sub>Last updated by README Auto Update on {now} UTC.</sub>")
-    return "\n".join(sections).strip() + "\n"
 
 
-def _plural(count: int, singular: str) -> str:
-    return singular if count == 1 else singular + "s"
+def _intro(snapshot: AccountSnapshot) -> str:
+    profile = snapshot.profile
+    return profile.bio or f"GitHub work and projects by @{profile.login}."
+
+
+def _stamp(now: str) -> str:
+    return f"<sub>Last updated by README Auto Update on {now} UTC.</sub>"
+
+
+def _join(blocks: list[str]) -> str:
+    return "\n\n".join(block for block in blocks if block).strip() + "\n"
+
+
+# --- templates: each returns the full managed-section Markdown ---------------
+
+def _tpl_icons(snapshot: AccountSnapshot, now: str) -> str:
+    icons = _skill_icons(snapshot)
+    return _join([
+        _intro(snapshot),
+        f"## 🛠️ Tech\n\n{icons}" if icons else "",
+        f"## 📊 Recent GitHub activity\n\n{_stats_line(snapshot)}",
+        _catalog(snapshot),
+        _stamp(now),
+    ])
+
+
+def _tpl_badges(snapshot: AccountSnapshot, now: str) -> str:
+    badges = _tech_badges(snapshot)
+    return _join([
+        _intro(snapshot),
+        f"## 🛠️ Tech\n\n{badges}" if badges else "",
+        f"## 📊 Recent GitHub activity\n\n{_stats_line(snapshot)}",
+        _catalog(snapshot),
+        _stamp(now),
+    ])
+
+
+def _tpl_table(snapshot: AccountSnapshot, now: str) -> str:
+    return _join([
+        _intro(snapshot),
+        f"## 📊 Recent GitHub activity\n\n{_stats_line(snapshot)}",
+        _catalog_tables(snapshot),
+        _stamp(now),
+    ])
+
+
+def _tpl_minimalist(snapshot: AccountSnapshot, now: str) -> str:
+    featured = _featured(snapshot, 3)
+    highlights = "\n".join(
+        f"- **[{r.name_with_owner.split('/')[-1]}]({r.parent_url or r.url})** — {r.description}"
+        if (r.url or r.parent_url) and r.description
+        else f"- **{r.name_with_owner.split('/')[-1]}**"
+        for r in featured
+    )
+    more = f"More across my [repositories](https://github.com/{snapshot.profile.login}?tab=repositories)."
+    groups = _grouped(snapshot)
+    private = "## 🔒 Private work\n\n" + _repository_line(groups["private"][0]) if groups.get("private") else ""
+    return _join([_intro(snapshot), highlights, more, private, _stamp(now)])
+
+
+def _tpl_playful(snapshot: AccountSnapshot, now: str) -> str:
+    login = snapshot.profile.login
+    top = _featured(snapshot, 1)
+    langs = _prominent_languages(snapshot)
+    facts = []
+    if top:
+        facts.append(f"- 🌟 Most-starred: **[{top[0].name_with_owner.split('/')[-1]}]({top[0].parent_url or top[0].url})**")
+    if langs:
+        facts.append(f"- 🧰 Mostly writing **{langs[0]}** lately")
+    facts.append(f"- 📈 **{snapshot.total_commits}** commits across the last stretch")
+    return _join([
+        f"### hey, I'm @{login} 👋✨",
+        _intro(snapshot),
+        "#### 🎈 a few fun facts\n\n" + "\n".join(facts),
+        _catalog(snapshot),
+        _stamp(now),
+    ])
+
+
+def _tpl_code_block(snapshot: AccountSnapshot, now: str) -> str:
+    profile = snapshot.profile
+    langs = ", ".join(f'"{lang}"' for lang in _prominent_languages(snapshot)[:6]) or '"—"'
+    top = _featured(snapshot, 1)
+    current = top[0].name_with_owner.split("/")[-1] if top else "building things"
+    class_name = "".join((profile.name or profile.login).split()) or "Developer"
+    code = "\n".join([
+        "```python",
+        f"class {class_name}:",
+        "    def __init__(self):",
+        f'        self.handle = "@{profile.login}"',
+        f"        self.languages = [{langs}]",
+        f'        self.currently = "{current}"',
+        "```",
+    ])
+    return _join([_intro(snapshot), code, _catalog(snapshot), _stamp(now)])
+
+
+def _tpl_banner(snapshot: AccountSnapshot, now: str) -> str:
+    profile = snapshot.profile
+    text = urllib.parse.quote(profile.name or profile.login)
+    banner = (
+        "![banner](https://capsule-render.vercel.app/api?type=waving"
+        "&color=0:0c7a8c,100:12a5bb&height=180&section=header"
+        f"&text={text}&fontColor=ffffff&fontSize=44&animation=fadeIn)"
+    )
+    return _join([
+        banner,
+        _intro(snapshot),
+        f"## 📊 Recent GitHub activity\n\n{_stats_line(snapshot)}",
+        _catalog(snapshot),
+        _stamp(now),
+    ])
+
+
+def _tpl_stats(snapshot: AccountSnapshot, now: str) -> str:
+    # Opt-in: sends the username to third-party stat services.
+    user = urllib.parse.quote(snapshot.profile.login)
+    cards = "\n\n".join([
+        f"![stats](https://github-readme-stats.vercel.app/api?username={user}&show_icons=true&hide_border=true)",
+        f"![languages](https://github-readme-stats.vercel.app/api/top-langs/?username={user}&layout=compact&hide_border=true)",
+    ])
+    return _join([_intro(snapshot), cards, _catalog(snapshot), _stamp(now)])
+
+
+_TEMPLATES = {
+    "icons": _tpl_icons,
+    "badges": _tpl_badges,
+    "table": _tpl_table,
+    "minimalist": _tpl_minimalist,
+    "playful": _tpl_playful,
+    "code-block": _tpl_code_block,
+    "banner": _tpl_banner,
+    "stats": _tpl_stats,
+}
+
+
+def rules_summary(snapshot: AccountSnapshot, template: str = "icons") -> str:
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    render = _TEMPLATES.get(template, _tpl_icons)
+    return render(snapshot, now)
 
 
 SYSTEM_INSTRUCTIONS = """You write the generated section of a developer's GitHub profile README.

@@ -47,7 +47,7 @@ def run(config: Config, root: Path | None = None) -> bool:
             extra_prompt=config.prompt,
         )
     else:
-        generated = rules_summary(snapshot)
+        generated = rules_summary(snapshot, template=config.template)
 
     if not old_document.strip():
         title = snapshot.profile.name or snapshot.profile.login

@@ -50,6 +50,7 @@ class Config:
     commit_email: str
     dry_run: bool
     anthropic_api_key: str = ""
+    template: str = "icons"
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -74,6 +75,12 @@ class Config:
         section_name = _input("section_name", "readme-auto-update")
         if not section_name or "--" in section_name or any(c in section_name for c in "<>"):
             raise ValueError("section_name contains unsupported characters")
+
+        from .generators import TEMPLATES
+
+        template = _input("template", "icons").lower()
+        if template not in TEMPLATES:
+            raise ValueError(f"template must be one of: {', '.join(TEMPLATES)}")
 
         return cls(
             github_token=github_token,
@@ -117,6 +124,7 @@ class Config:
                 "readme-auto-update-bot@example.invalid",
             ),
             dry_run=_bool(_input("dry_run", "false"), name="dry_run"),
+            template=template,
         )
 
     @property

@@ -3,7 +3,7 @@ import unittest
 from dataclasses import replace
 from unittest.mock import patch
 
-from readme_auto_update.generators import _skill_icons, ai_summary, rules_summary
+from readme_auto_update.generators import TEMPLATES, _skill_icons, ai_summary, rules_summary
 from readme_auto_update.snapshot import AccountSnapshot, Profile, RepositorySummary
 
 
@@ -92,6 +92,31 @@ class GeneratorTests(unittest.TestCase):
         output = rules_summary(sample_snapshot())
         self.assertIn("🛠️ Tech", output)
         self.assertIn("skillicons.dev/icons?i=rust", output)
+
+    def test_every_template_renders_with_its_marker_and_stamp(self):
+        snap = sample_snapshot()
+        markers = {
+            "icons": "skillicons.dev",
+            "badges": "img.shields.io",
+            "table": "| Project |",
+            "minimalist": "?tab=repositories",
+            "playful": "fun facts",
+            "code-block": "```python",
+            "banner": "capsule-render",
+            "stats": "github-readme-stats",
+        }
+        self.assertEqual(set(markers), set(TEMPLATES))
+        for name in TEMPLATES:
+            out = rules_summary(snap, template=name)
+            self.assertIn("README Auto Update on", out, f"{name} missing stamp")
+            self.assertIn(markers[name], out, f"{name} missing marker")
+
+    def test_unknown_template_falls_back_to_icons(self):
+        snap = sample_snapshot()
+        self.assertEqual(
+            rules_summary(snap, template="hologram"),
+            rules_summary(snap, template="icons"),
+        )
 
     def test_skill_icons_orders_by_use_skips_unmapped_and_private(self):
         snap = sample_snapshot()
