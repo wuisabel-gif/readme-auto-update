@@ -9,6 +9,44 @@ from . import USER_AGENT
 from .snapshot import AccountSnapshot, RepositorySummary
 
 
+# GitHub language name -> skillicons.dev id. Languages absent here are simply
+# omitted from the icon row (skillicons has no icon for them).
+_SKILLICON_IDS = {
+    "Rust": "rust", "Python": "python", "C++": "cpp", "C": "c",
+    "JavaScript": "js", "TypeScript": "ts", "Go": "go", "C#": "cs",
+    "Dart": "dart", "Kotlin": "kotlin", "Lua": "lua", "Ruby": "ruby",
+    "Shell": "bash", "HTML": "html", "CSS": "css", "Swift": "swift",
+    "Java": "java", "PHP": "php", "Vue": "vue",
+}
+
+
+def _prominent_languages(snapshot: AccountSnapshot) -> list[str]:
+    """Languages across visible repositories, most-used first. The anonymized
+    private aggregate and repos with no detected language are excluded."""
+    counts: dict[str, int] = {}
+    for repository in snapshot.repositories:
+        if repository.relationship == "private" or not repository.language:
+            continue
+        counts[repository.language] = counts.get(repository.language, 0) + 1
+    return sorted(counts, key=lambda language: (-counts[language], language))
+
+
+def _skill_icons(snapshot: AccountSnapshot) -> str:
+    """A single skillicons.dev image row for the account's languages. Sends the
+    tech list only — never the username — so it leaks nothing about the account."""
+    ids: list[str] = []
+    for language in _prominent_languages(snapshot):
+        icon = _SKILLICON_IDS.get(language)
+        if icon and icon not in ids:
+            ids.append(icon)
+    if not ids:
+        return ""
+    return f"![Tech]({_SKILLICONS_BASE}?i={','.join(ids[:15])})"
+
+
+_SKILLICONS_BASE = "https://skillicons.dev/icons"
+
+
 def _repository_line(repository: RepositorySummary) -> str:
     activity: list[str] = []
     if repository.commits:
@@ -49,19 +87,23 @@ def rules_summary(snapshot: AccountSnapshot) -> str:
     for repository in snapshot.repositories:
         repositories_by_relationship.setdefault(repository.relationship, []).append(repository)
 
-    sections: list[str] = [
-        f"{introduction}\n",
-        "## Recent GitHub activity\n",
+    sections: list[str] = [f"{introduction}\n"]
+    icons = _skill_icons(snapshot)
+    if icons:
+        sections.append("## 🛠️ Tech\n")
+        sections.append(icons + "\n")
+    sections += [
+        "## 📊 Recent GitHub activity\n",
         f"Across the selected period: **{snapshot.total_commits} {_plural(snapshot.total_commits, 'commit')}**, "
         f"**{snapshot.total_pull_requests} {_plural(snapshot.total_pull_requests, 'pull request')}**, "
         f"**{snapshot.total_reviews} {_plural(snapshot.total_reviews, 'review')}**, and "
         f"**{snapshot.total_issues} {_plural(snapshot.total_issues, 'issue')}**.\n",
     ]
     headings = (
-        ("owned", "## Projects"),
-        ("organization", "## Organization work"),
-        ("open_source", "## Open-source contributions"),
-        ("private", "## Private work"),
+        ("owned", "## 🚀 Projects"),
+        ("organization", "## 🏛️ Organization work"),
+        ("open_source", "## 🤝 Open-source contributions"),
+        ("private", "## 🔒 Private work"),
     )
     for relationship, heading in headings:
         repositories = repositories_by_relationship.get(relationship) or []

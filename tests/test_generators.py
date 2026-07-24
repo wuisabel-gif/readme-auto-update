@@ -1,8 +1,9 @@
 import json
 import unittest
+from dataclasses import replace
 from unittest.mock import patch
 
-from readme_auto_update.generators import ai_summary, rules_summary
+from readme_auto_update.generators import _skill_icons, ai_summary, rules_summary
 from readme_auto_update.snapshot import AccountSnapshot, Profile, RepositorySummary
 
 
@@ -82,10 +83,28 @@ class FakeResponse:
 class GeneratorTests(unittest.TestCase):
     def test_rules_writer_separates_projects_and_private_work(self):
         output = rules_summary(sample_snapshot())
-        self.assertIn("## Projects", output)
+        self.assertIn("Projects", output)
         self.assertIn("sample-project", output)
-        self.assertIn("## Private work", output)
+        self.assertIn("Private work", output)
         self.assertNotIn("example-org/private-project", output)
+
+    def test_rules_writer_emits_a_skill_icon_tech_row(self):
+        output = rules_summary(sample_snapshot())
+        self.assertIn("🛠️ Tech", output)
+        self.assertIn("skillicons.dev/icons?i=rust", output)
+
+    def test_skill_icons_orders_by_use_skips_unmapped_and_private(self):
+        snap = sample_snapshot()
+        template = snap.repositories[0]
+        repos = (
+            replace(template, name_with_owner="u/a", language="Python", relationship="owned"),
+            replace(template, name_with_owner="u/b", language="Python", relationship="owned"),
+            replace(template, name_with_owner="u/c", language="Go", relationship="owned"),
+            replace(template, name_with_owner="u/d", language="Julia", relationship="owned"),
+            replace(template, name_with_owner="Private work", language="", relationship="private"),
+        )
+        row = _skill_icons(replace(snap, repositories=repos))
+        self.assertEqual(row, "![Tech](https://skillicons.dev/icons?i=python,go)")
 
     @patch("readme_auto_update.generators.urllib.request.urlopen")
     def test_ai_writer_receives_structured_evidence(self, urlopen):
