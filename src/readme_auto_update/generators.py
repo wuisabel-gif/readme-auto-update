@@ -51,7 +51,7 @@ def _prominent_languages(snapshot: AccountSnapshot) -> list[str]:
 
 
 def _skill_icons(snapshot: AccountSnapshot) -> str:
-    """A skillicons.dev image row. Sends the tech list only — never the username."""
+    """A skillicons.dev image row. Sends the tech list only, never the username."""
     ids: list[str] = []
     for language in _prominent_languages(snapshot):
         icon = _SKILLICON_IDS.get(language)
@@ -95,7 +95,7 @@ def _repository_line(repository: RepositorySummary) -> str:
         activity.append(f"{repository.restricted} additional private contributions")
     details = ", ".join(activity) or "portfolio repository"
     language = f" · {repository.language}" if repository.language else ""
-    description = f" — {repository.description}" if repository.description else ""
+    description = f". {repository.description}" if repository.description else ""
     fork = ""
     if repository.is_fork and repository.parent_name_with_owner:
         target = repository.parent_url or repository.url
@@ -157,8 +157,8 @@ def _catalog_tables(snapshot: AccountSnapshot) -> str:
             label = r.name_with_owner.split("/")[-1]
             target = r.parent_url or r.url
             name = f"[{label}]({target})" if target else f"**{label}**"
-            desc = (r.description or "—").replace("|", "\\|").replace("\n", " ")
-            rows.append(f"| {name} | {desc} | {r.language or '—'} |")
+            desc = (r.description or "").replace("|", "\\|").replace("\n", " ")
+            rows.append(f"| {name} | {desc} | {r.language or ''} |")
         blocks.append(f"{heading}\n\n" + "\n".join(rows))
     note = _private_note(snapshot)
     if note:
@@ -224,7 +224,7 @@ def _tpl_table(snapshot: AccountSnapshot, now: str) -> str:
 def _tpl_minimalist(snapshot: AccountSnapshot, now: str) -> str:
     featured = _featured(snapshot, 3)
     highlights = "\n".join(
-        f"- **[{r.name_with_owner.split('/')[-1]}]({r.parent_url or r.url})** — {r.description}"
+        f"- **[{r.name_with_owner.split('/')[-1]}]({r.parent_url or r.url})**: {r.description}"
         if (r.url or r.parent_url) and r.description
         else f"- **{r.name_with_owner.split('/')[-1]}**"
         for r in featured
@@ -254,7 +254,7 @@ def _tpl_playful(snapshot: AccountSnapshot, now: str) -> str:
 
 def _tpl_code_block(snapshot: AccountSnapshot, now: str) -> str:
     profile = snapshot.profile
-    langs = ", ".join(f'"{lang}"' for lang in _prominent_languages(snapshot)[:6]) or '"—"'
+    langs = ", ".join(f'"{lang}"' for lang in _prominent_languages(snapshot)[:6]) or ""
     top = _featured(snapshot, 1)
     current = top[0].name_with_owner.split("/")[-1] if top else "building things"
     class_name = "".join((profile.name or profile.login).split()) or "Developer"
