@@ -6,7 +6,7 @@
 [![Live demo](https://img.shields.io/badge/demo-live-12a5bb)](https://wuisabel-gif.github.io/readme-auto-update/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Create and refresh evidence-based READMEs — a project's or your GitHub profile's — from real
+**Create and refresh evidence-based READMEs, for a project or your GitHub profile, from real
 repository activity, while every hand-written section stays exactly as you left it.**
 
 ▶ **[Live demo](https://wuisabel-gif.github.io/readme-auto-update/)** &nbsp;·&nbsp;
@@ -21,7 +21,7 @@ repositories, organization work, open-source contributions, and privacy-safe pri
 totals.
 
 The skill is the primary product. It lets you review the evidence and proposed README in an
-interactive session and does not require any model API key — the agent you are already running is
+interactive session and does not require any model API key. The agent you are already running is
 the writer. An optional GitHub Action is included for scheduled, unattended updates.
 
 ## What it can update
@@ -125,7 +125,7 @@ injected markers instead of risking unrelated README content.
 
 ## Example generated profile README
 
-The best output should read like a person explaining what they care about—not a dashboard reciting
+The best output should read like a person explaining what they care about, not a dashboard reciting
 commit counts. This fictional AI-written example uses repository and contribution evidence to tell
 a compact story. The introduction and footer remain hand-written; only the marked section is
 regenerated.
@@ -196,8 +196,8 @@ identity remains hidden unless `show_private_names` is explicitly enabled.
 
 ## Optional automatic updates
 
-The included GitHub Action — on the
-[GitHub Marketplace](https://github.com/marketplace/actions/readme-auto-update) — keeps a profile
+The included GitHub Action, on the
+[GitHub Marketplace](https://github.com/marketplace/actions/readme-auto-update), keeps a profile
 README current on a schedule. Add it to any repository in a few lines:
 
 ```yaml
@@ -210,8 +210,8 @@ README current on a schedule. Add it to any repository in a few lines:
 The full scheduled setup follows. Add these repository secrets under
 **Settings → Secrets and variables → Actions**:
 
-- `README_AUTO_UPDATE_GITHUB_TOKEN` — user-authorized token for account discovery
-- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` — optional; either one enables the Action's AI writer
+- `README_AUTO_UPDATE_GITHUB_TOKEN`: user-authorized token for account discovery
+- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`: optional; either one enables the Action's AI writer
 
 Then create `.github/workflows/readme-auto-update.yml`:
 
@@ -263,7 +263,7 @@ git push origin v1.0.0
 
 The [`Release`](.github/workflows/release.yml) workflow validates the tag and force-updates the Git
 `v1` tag to the released commit (for a `v1.x.y` release), so `@v1` always tracks the latest release.
-The action runs from the `Dockerfile` at the resolved tag — GitHub builds the image on the runner —
+The action runs from the `Dockerfile` at the resolved tag (GitHub builds the image on the runner),
 so there is no separately published image to keep in sync. The workflow uses the repository
 `GITHUB_TOKEN` with only the contents access needed for the tag update, and the `v1` update is
 guarded so it does not recursively run another release.
@@ -300,7 +300,7 @@ markdown-native layout with **no model request and no cost**. Pick a look with t
 
 Want a **narrative "builder's story"** instead of a structural layout? Run the skill in
 your own agent (Claude Code, Codex, Cursor, Gemini), or polish the prose with
-[Cadence](https://github.com/wuisabel-gif/Cadence). No API key required for either.
+[Cadence](https://wuisabel-gif.github.io/Cadence/). No API key required for either.
 
 ### Advanced: unattended AI narrative
 
@@ -320,8 +320,8 @@ If the AI writer errors, the run **falls back to your chosen `template`** and st
 | Input | Default | Description |
 | --- | --- | --- |
 | `github_token` | required | User-authorized token used for account discovery |
-| `openai_api_key` | — | AI mode requires this or `anthropic_api_key` |
-| `anthropic_api_key` | — | Used in AI mode when no OpenAI key is set |
+| `openai_api_key` | none | AI mode requires this or `anthropic_api_key` |
+| `anthropic_api_key` | none | Used in AI mode when no OpenAI key is set |
 | `mode` | `auto` | `auto`, `ai`, or `rules` |
 | `template` | `icons` | Free structural layout: `icons`, `badges`, `table`, `minimalist`, `playful`, `code-block`, `banner`, `stats` |
 | `strict` | `false` | Fail the run if the AI writer errors, instead of falling back to `template` |
@@ -336,7 +336,7 @@ If the AI writer errors, the run **falls back to your chosen `template`** and st
 | `include_private` | `true` | Include permitted private activity anonymously |
 | `show_private_names` | `false` | Expose private repository metadata to the writer and output |
 | `include_archived` | `false` | Include archived repositories |
-| `prompt` | — | Additional AI style or content preferences |
+| `prompt` | none | Additional AI style or content preferences |
 | `commit` | `true` | Commit and push a changed README |
 | `dry_run` | `false` | Print the proposed diff without writing or pushing |
 
@@ -380,15 +380,21 @@ python3 -m compileall -q entrypoint.py src tests skills/readme-auto-update/scrip
 docker build -t readme-auto-update .
 ```
 
-## Pair with Cadence
+## Pairs with Cadence and elegance
 
-README Auto Update assembles the **structure** for free — badges, icons, grouped work, all with no
-agent and no API key. **[Cadence](https://github.com/wuisabel-gif/Cadence)** turns the **prose**
-into a story: after generating a section, run Cadence to humanize the intro and project blurbs into
-a voice that sounds like you. It scores prose for machine-generated patterns and rewrites it in a
-chosen voice — no extra key, since it runs in the agent you already have.
+README Auto Update assembles the **structure** for free: badges, icons, grouped work, all with no
+agent and no API key. Two companion tools take it further, and both run in the agent you already
+have, so neither needs a key:
 
-Both skills are co-listed in one marketplace, so you can install the pair in one place:
+- **[Cadence](https://wuisabel-gif.github.io/Cadence/)** turns the **prose** into a story. After
+  generating a section, run Cadence to humanize the intro and project blurbs into a voice that
+  sounds like you. It scores prose for machine-generated patterns and rewrites it in a chosen voice.
+- **[elegance](https://wuisabel-gif.github.io/elegance/)** builds the **website** around it. When
+  your profile deserves a landing page rather than a README, elegance scaffolds a themed PHP site
+  and can de-slop the copy through Cadence on the way.
+
+Cadence and README Auto Update are co-listed in one marketplace, so you can install the pair in one
+place:
 
 ```text
 /plugin marketplace add wuisabel-gif/Cadence
