@@ -56,9 +56,8 @@ def _generate(config: Config, snapshot, old_document: str) -> tuple[str, str]:
     if config.mode == "auto":
         notice(
             f"Wrote the free structural README (rules mode, template: {config.template}). "
-            "For a narrative 'builder's story', run it in your agent, polish with Cadence "
-            "(https://github.com/wuisabel-gif/Cadence), or add an OpenAI/Anthropic key for "
-            "the scheduled Action."
+            "For a narrative 'builder's story', run it in your own agent, or add an "
+            "OpenAI/Anthropic key to have the scheduled Action write the prose."
         )
     return generated, "rules"
 
